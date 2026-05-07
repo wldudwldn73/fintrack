@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { TransactionInsert } from './types'
+import { TransactionInsert, RECURRING_CATEGORIES } from './types'
 import { getRuleBasedCategory } from './categoryRules'
 
 function parseDate(raw: string | number): string {
@@ -157,8 +157,9 @@ function parseRows(rows: (string | number | undefined)[][]): ParseResult {
       // rawDesc가 실제 사용처(description)와 다를 때만 결제수단으로 저장
       const payment_method = rawDesc && rawDesc !== description ? rawDesc : undefined
       const institution = institutionIdx !== -1 ? String(cols[institutionIdx] ?? '').trim() || undefined : undefined
+      const is_recurring = RECURRING_CATEGORIES.has(category)
 
-      transactions.push({ type, amount, category, description: description || undefined, payment_method, institution, date })
+      transactions.push({ type, amount, category, description: description || undefined, payment_method, institution, is_recurring, date })
     } catch {
       skipped++
     }

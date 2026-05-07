@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { parseTossFile, ParseResult } from '@/lib/parseTossFile'
-import { TransactionInsert } from '@/lib/types'
+import { TransactionInsert, RECURRING_CATEGORIES } from '@/lib/types'
 import { getTransactionsByDateRange } from '@/lib/transactions'
 
 interface Props {
@@ -14,6 +14,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
   const [result, setResult] = useState<ParseResult | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const [transferIndices, setTransferIndices] = useState<Set<number>>(new Set())
+  const [recurringIndices, setRecurringIndices] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [categorizing, setCategorizing] = useState(false)
@@ -25,6 +26,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
     setResult(null)
     setExcluded(new Set())
     setTransferIndices(new Set())
+    setRecurringIndices(new Set())
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
@@ -49,19 +51,21 @@ export default function CsvImport({ onImport, onClose }: Props) {
           if (Array.isArray(categories)) {
             setResult(prev => prev ? {
               ...prev,
-              transactions: prev.transactions.map((t, i) => ({
-                ...t,
-                category: categories[i] ?? t.category
-              }))
+              transactions: prev.transactions.map((t, i) => {
+                const cat = categories[i] ?? t.category
+                return { ...t, category: cat, is_recurring: RECURRING_CATEGORIES.has(cat) || !!t.is_recurring }
+              })
             } : null)
           }
         } catch {}
         setCategorizing(false)
 
-        // 이체 감지: DB의 기존 거래와 날짜+금액+반대타입 매칭
+        // 이체 감지 + 고정지출 이력 감지
         try {
           const dates = parsed.transactions.map(t => t.date).sort()
           const existing = await getTransactionsByDateRange(dates[0], dates[dates.length - 1])
+
+          // 이체: 같은 날짜 + 금액 + 반대 방향
           const existingKeys = new Set(existing.map(e => `${e.date}|${e.amount}|${e.type}`))
           const transfers = new Set<number>()
           parsed.transactions.forEach((t, i) => {
@@ -70,6 +74,31 @@ export default function CsvImport({ onImport, onClose }: Props) {
           })
           setTransferIndices(transfers)
           setExcluded(transfers)
+
+          // 고정지출: 이전 달에도 같은 description이 존재하면 반복 지출로 판단
+          const existingDescMonths: Record<string, Set<string>> = {}
+          for (const e of existing) {
+            if (!e.description) continue
+            const key = e.description.trim()
+            if (!existingDescMonths[key]) existingDescMonths[key] = new Set()
+            existingDescMonths[key].add(e.date.slice(0, 7))
+          }
+          const recurring = new Set<number>()
+          setResult(prev => {
+            if (!prev) return null
+            return {
+              ...prev,
+              transactions: prev.transactions.map((t, i) => {
+                const desc = t.description?.trim() ?? ''
+                const historyMonths = existingDescMonths[desc]
+                const fromHistory = !!historyMonths && historyMonths.size >= 1
+                const isRec = RECURRING_CATEGORIES.has(t.category) || fromHistory
+                if (isRec) recurring.add(i)
+                return { ...t, is_recurring: isRec }
+              })
+            }
+          })
+          setRecurringIndices(recurring)
         } catch {}
       } catch (err) {
         setError(err instanceof Error ? err.message : '파일 파싱 실패')
@@ -166,6 +195,9 @@ export default function CsvImport({ onImport, onClose }: Props) {
                             ? <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
                             : <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
                           }
+                          {recurringIndices.has(i) && !transferIndices.has(i) && (
+                            <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
+                          )}
                           {tx.description && <span className="text-sm text-gray-800 font-medium truncate">{tx.description}</span>}
                         </div>
                         {tx.payment_method && (

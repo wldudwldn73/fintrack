@@ -28,6 +28,10 @@ function getWeekLabel(week: number, year: number, month: number) {
 
 export default function Dashboard({ transactions, year, month }: Props) {
   const expenses = transactions.filter(t => t.type === 'expense')
+  const fixedExpenses = expenses.filter(t => t.is_recurring)
+  const variableExpenses = expenses.filter(t => !t.is_recurring)
+  const fixedTotal = fixedExpenses.reduce((s, t) => s + t.amount, 0)
+  const variableTotal = variableExpenses.reduce((s, t) => s + t.amount, 0)
 
   // 주별 지출
   const weeklyMap: Record<number, number> = {}
@@ -74,6 +78,20 @@ export default function Dashboard({ transactions, year, month }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* 고정 vs 변동 */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-2xl px-4 py-4 shadow-sm">
+          <p className="text-xs text-gray-400 mb-1">고정지출</p>
+          <p className="text-lg font-bold text-orange-500">{fixedTotal.toLocaleString('ko-KR')}원</p>
+          <p className="text-xs text-gray-400 mt-0.5">{fixedExpenses.length}건 · 구독·주거 등</p>
+        </div>
+        <div className="bg-white rounded-2xl px-4 py-4 shadow-sm">
+          <p className="text-xs text-gray-400 mb-1">변동지출</p>
+          <p className="text-lg font-bold text-gray-800">{variableTotal.toLocaleString('ko-KR')}원</p>
+          <p className="text-xs text-gray-400 mt-0.5">{variableExpenses.length}건</p>
+        </div>
+      </div>
+
       {/* 주별 지출 */}
       <div className="bg-white rounded-2xl px-4 py-5 shadow-sm">
         <p className="text-xs text-gray-400 mb-3">주별 지출</p>
