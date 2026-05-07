@@ -1,9 +1,10 @@
 import Groq from 'groq-sdk'
 import { NextRequest } from 'next/server'
 import { getRuleBasedCategory } from '@/lib/categoryRules'
-import { supabase } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient()
   const { transactions } = await req.json()
   if (!transactions?.length) return Response.json({ categories: [] })
 

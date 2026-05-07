@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -54,10 +55,7 @@ async function executeTool(name: string, args: Record<string, unknown>, supabase
 
 export async function POST(req: NextRequest) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = await createServerSupabaseClient()
   const { message, year, month, history } = await req.json()
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`

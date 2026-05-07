@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { type User } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 import MonthlySummary from '@/components/MonthlySummary'
 import TransactionList from '@/components/TransactionList'
 import TransactionForm from '@/components/TransactionForm'
@@ -13,6 +15,7 @@ import { getTransactions, addTransaction, addTransactions, deleteTransaction } f
 
 export default function Home() {
   const now = new Date()
+  const [user, setUser] = useState<User | null>(null)
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -21,6 +24,19 @@ export default function Home() {
   const [showChat, setShowChat] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,6 +96,13 @@ export default function Home() {
               className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
             >
               CSV 가져오기
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
+              title={user?.email ?? ''}
+            >
+              로그아웃
             </button>
           </div>
         </div>
