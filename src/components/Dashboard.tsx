@@ -1,11 +1,15 @@
 'use client'
 
-import { Transaction } from '@/lib/types'
+import { useState } from 'react'
+import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
+import { getCategoryColor } from '@/lib/categoryColors'
+import { updateTransactionCategory } from '@/lib/transactions'
 
 interface Props {
   transactions: Transaction[]
   year: number
   month: number
+  onCategoryChange: (id: string, category: string) => void
 }
 
 function getWeekOfMonth(dateStr: string, year: number, month: number) {
@@ -26,7 +30,46 @@ function getWeekLabel(week: number, year: number, month: number) {
   return `${week}주 (${fmt(start)}~${fmt(end)})`
 }
 
-export default function Dashboard({ transactions, year, month }: Props) {
+function CategoryBadge({ tx, onCategoryChange }: { tx: Transaction; onCategoryChange: (id: string, cat: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const colors = getCategoryColor(tx.category)
+  const cats = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+
+  if (editing) {
+    return (
+      <div className="flex flex-wrap gap-1 mt-1" onClick={e => e.stopPropagation()}>
+        {cats.map(c => {
+          const cc = getCategoryColor(c)
+          return (
+            <button
+              key={c}
+              onClick={async () => {
+                await updateTransactionCategory(tx.id, c)
+                onCategoryChange(tx.id, c)
+                setEditing(false)
+              }}
+              className={`text-xs px-2 py-0.5 rounded-full ${tx.category === c ? `${cc.bg} ${cc.text} font-semibold` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+            >
+              {c}
+            </button>
+          )
+        })}
+        <button onClick={() => setEditing(false)} className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-400">취소</button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${colors.bg} ${colors.text} hover:opacity-80`}
+    >
+      {tx.category} ✎
+    </button>
+  )
+}
+
+export default function Dashboard({ transactions, year, month, onCategoryChange }: Props) {
   const expenses = transactions.filter(t => t.type === 'expense')
   const fixedExpenses = expenses.filter(t => t.is_recurring)
   const variableExpenses = expenses.filter(t => !t.is_recurring)
@@ -50,27 +93,20 @@ export default function Dashboard({ transactions, year, month }: Props) {
     payment_method: string
     institution: string | null
     total: number
-    items: { description: string; amount: number }[]
+    txs: Transaction[]
   }
   const methodMap: Record<string, MethodGroup> = {}
-
   for (const t of expenses) {
     const pm = t.payment_method ?? '직접입력'
     const inst = t.institution ?? null
     const key = `${inst ?? ''}__${pm}`
-    if (!methodMap[key]) {
-      methodMap[key] = { key, payment_method: pm, institution: inst, total: 0, items: [] }
-    }
+    if (!methodMap[key]) methodMap[key] = { key, payment_method: pm, institution: inst, total: 0, txs: [] }
     methodMap[key].total += t.amount
-    const desc = t.description ?? '(내역없음)'
-    const existing = methodMap[key].items.find(i => i.description === desc)
-    if (existing) existing.amount += t.amount
-    else methodMap[key].items.push({ description: desc, amount: t.amount })
+    methodMap[key].txs.push(t)
   }
-
   const methods = Object.values(methodMap)
     .sort((a, b) => b.total - a.total)
-    .map(m => ({ ...m, items: m.items.sort((a, b) => b.amount - a.amount) }))
+    .map(m => ({ ...m, txs: m.txs.sort((a, b) => b.amount - a.amount) }))
 
   if (expenses.length === 0) {
     return <div className="text-center py-16 text-gray-400 text-sm">지출 내역이 없어요</div>
@@ -83,7 +119,7 @@ export default function Dashboard({ transactions, year, month }: Props) {
         <div className="bg-white rounded-2xl px-4 py-4 shadow-sm">
           <p className="text-xs text-gray-400 mb-1">고정지출</p>
           <p className="text-lg font-bold text-orange-500">{fixedTotal.toLocaleString('ko-KR')}원</p>
-          <p className="text-xs text-gray-400 mt-0.5">{fixedExpenses.length}건 · 구독·주거 등</p>
+          <p className="text-xs text-gray-400 mt-0.5">{fixedExpenses.length}건</p>
         </div>
         <div className="bg-white rounded-2xl px-4 py-4 shadow-sm">
           <p className="text-xs text-gray-400 mb-1">변동지출</p>
@@ -103,10 +139,7 @@ export default function Dashboard({ transactions, year, month }: Props) {
                 <span className="text-xs font-semibold text-gray-800">{amount.toLocaleString('ko-KR')}원</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gray-800 rounded-full transition-all duration-500"
-                  style={{ width: `${(amount / maxWeekly) * 100}%` }}
-                />
+                <div className="h-full bg-gray-800 rounded-full" style={{ width: `${(amount / maxWeekly) * 100}%` }} />
               </div>
             </div>
           ))}
@@ -118,7 +151,6 @@ export default function Dashboard({ transactions, year, month }: Props) {
         <p className="text-xs text-gray-400 px-1">결제수단별</p>
         {methods.map(m => (
           <div key={m.key} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            {/* 헤더 */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-800">{m.payment_method}</span>
@@ -126,22 +158,23 @@ export default function Dashboard({ transactions, year, month }: Props) {
                   <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{m.institution}</span>
                 )}
               </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-red-500">-{m.total.toLocaleString('ko-KR')}원</span>
-                <span className="text-xs text-gray-400 ml-1.5">{m.items.length}곳</span>
-              </div>
+              <span className="text-sm font-bold text-red-500">-{m.total.toLocaleString('ko-KR')}원</span>
             </div>
-            {/* 하위 항목 */}
             <div className="divide-y divide-gray-50">
-              {m.items.slice(0, 5).map((item, i) => (
-                <div key={i} className="flex justify-between items-center px-4 py-2.5">
-                  <span className="text-sm text-gray-600 truncate">{item.description}</span>
-                  <span className="text-sm text-gray-700 ml-2 shrink-0">{item.amount.toLocaleString('ko-KR')}원</span>
+              {m.txs.map(tx => (
+                <div key={tx.id} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CategoryBadge tx={tx} onCategoryChange={onCategoryChange} />
+                      {tx.is_recurring && (
+                        <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
+                      )}
+                      <span className="text-sm text-gray-700 truncate">{tx.description ?? '(내역없음)'}</span>
+                    </div>
+                    <span className="text-sm text-gray-800 ml-2 shrink-0">{tx.amount.toLocaleString('ko-KR')}원</span>
+                  </div>
                 </div>
               ))}
-              {m.items.length > 5 && (
-                <div className="px-4 py-2 text-xs text-gray-400">+{m.items.length - 5}개 더</div>
-              )}
             </div>
           </div>
         ))}

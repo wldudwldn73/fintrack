@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { parseTossFile, ParseResult } from '@/lib/parseTossFile'
 import { TransactionInsert, RECURRING_CATEGORIES, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getTransactionsByDateRange } from '@/lib/transactions'
+import { getCategoryColor } from '@/lib/categoryColors'
 
 interface Props {
   onImport: (transactions: TransactionInsert[]) => Promise<void>
@@ -206,23 +207,31 @@ export default function CsvImport({ onImport, onClose }: Props) {
                             <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
                           ) : editingCategoryIdx === i ? (
                             <div className="flex flex-wrap gap-1 mt-0.5">
-                              {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
-                                <button
-                                  key={c}
-                                  onClick={() => changeCategory(i, c)}
-                                  className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.category === c ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                >
-                                  {c}
-                                </button>
-                              ))}
+                              {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => {
+                                const cc = getCategoryColor(c)
+                                return (
+                                  <button
+                                    key={c}
+                                    onClick={() => changeCategory(i, c)}
+                                    className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.category === c ? `${cc.bg} ${cc.text} font-semibold` : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                  >
+                                    {c}
+                                  </button>
+                                )
+                              })}
                             </div>
                           ) : (
-                            <button
-                              onClick={() => setEditingCategoryIdx(i)}
-                              className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0 hover:bg-gray-200"
-                            >
-                              {tx.category} ✎
-                            </button>
+                            (() => {
+                              const cc = getCategoryColor(tx.category)
+                              return (
+                                <button
+                                  onClick={() => setEditingCategoryIdx(i)}
+                                  className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 hover:opacity-80 ${cc.bg} ${cc.text}`}
+                                >
+                                  {tx.category} ✎
+                                </button>
+                              )
+                            })()
                           )}
                           {recurringIndices.has(i) && !transferIndices.has(i) && editingCategoryIdx !== i && (
                             <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>

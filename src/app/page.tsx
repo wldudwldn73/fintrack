@@ -120,7 +120,7 @@ export default function Home() {
         ) : tab === 'category' ? (
           <CategoryBreakdown transactions={transactions} />
         ) : (
-          <Dashboard transactions={transactions} year={year} month={month} />
+          <Dashboard transactions={transactions} year={year} month={month} onCategoryChange={handleCategoryChange} />
         )}
       </div>
 

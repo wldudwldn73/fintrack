@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { Transaction } from '@/lib/types'
+import { getCategoryColor } from '@/lib/categoryColors'
 
 interface Props {
   transactions: Transaction[]
@@ -11,12 +12,6 @@ const CATEGORY_EMOJI: Record<string, string> = {
   식비: '🍽', 카페: '☕', 편의점: '🏪', 교통: '🚌', 쇼핑: '🛍', 구독: '📱',
   주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 급여: '💰', 투자: '📈', 기타: '📦',
 }
-
-const COLORS = [
-  '#1f2937', '#374151', '#4b5563', '#6b7280',
-  '#9ca3af', '#d1d5db', '#e5e7eb', '#f3f4f6',
-  '#111827', '#6b7280',
-]
 
 export default function CategoryBreakdown({ transactions }: Props) {
   const expenses = transactions.filter(t => t.type === 'expense')
@@ -53,8 +48,8 @@ export default function CategoryBreakdown({ transactions }: Props) {
               paddingAngle={2}
               dataKey="value"
             >
-              {chartData.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              {chartData.map((entry, i) => (
+                <Cell key={i} fill={getCategoryColor(entry.name).dot} />
               ))}
             </Pie>
             <Tooltip
@@ -66,9 +61,9 @@ export default function CategoryBreakdown({ transactions }: Props) {
 
         {/* 범례 */}
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 justify-center">
-          {sorted.map(([category], i) => (
+          {sorted.map(([category]) => (
             <div key={category} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(category).dot }} />
               <span className="text-xs text-gray-600">{category}</span>
             </div>
           ))}
@@ -99,7 +94,7 @@ export default function CategoryBreakdown({ transactions }: Props) {
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                  style={{ width: `${pct}%`, backgroundColor: getCategoryColor(category).dot }}
                 />
               </div>
             </div>

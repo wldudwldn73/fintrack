@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { updateTransactionCategory } from '@/lib/transactions'
+import { getCategoryColor } from '@/lib/categoryColors'
 
 interface Props {
   transactions: Transaction[]
@@ -61,27 +62,25 @@ export default function TransactionList({ transactions, onDelete, onCategoryChan
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {editingId === tx.id ? (
                         <div className="flex flex-wrap gap-1 w-full">
-                          {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
-                            <button
-                              key={c}
-                              onClick={() => handleCategoryChange(tx.id, c)}
-                              className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.category === c ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                            >
-                              {c}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-400 hover:bg-red-100"
-                          >
-                            취소
-                          </button>
+                          {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => {
+                            const cc = getCategoryColor(c)
+                            return (
+                              <button
+                                key={c}
+                                onClick={() => handleCategoryChange(tx.id, c)}
+                                className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.category === c ? `${cc.bg} ${cc.text} font-semibold` : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                              >
+                                {c}
+                              </button>
+                            )
+                          })}
+                          <button onClick={() => setEditingId(null)} className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-400">취소</button>
                         </div>
                       ) : (
                         <>
                           <button
                             onClick={() => setEditingId(tx.id)}
-                            className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0 hover:bg-gray-200"
+                            className={`text-xs px-2 py-0.5 rounded-full shrink-0 hover:opacity-80 ${getCategoryColor(tx.category).bg} ${getCategoryColor(tx.category).text}`}
                           >
                             {tx.category} ✎
                           </button>
