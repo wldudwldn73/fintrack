@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
-import { updateTransactionCategory } from '@/lib/transactions'
+import { updateTransactionCategory, updateTransactionRecurring } from '@/lib/transactions'
 import { getCategoryColor } from '@/lib/categoryColors'
 
 interface Props {
   transactions: Transaction[]
   onDelete: (id: string) => void
   onCategoryChange: (id: string, category: string) => void
+  onRecurringChange: (id: string, is_recurring: boolean) => void
 }
 
 function groupByDate(transactions: Transaction[]) {
@@ -25,13 +26,18 @@ function formatDate(dateStr: string) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${['일', '월', '화', '수', '목', '금', '토'][d.getDay()]})`
 }
 
-export default function TransactionList({ transactions, onDelete, onCategoryChange }: Props) {
+export default function TransactionList({ transactions, onDelete, onCategoryChange, onRecurringChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   async function handleCategoryChange(id: string, category: string) {
     await updateTransactionCategory(id, category)
     onCategoryChange(id, category)
     setEditingId(null)
+  }
+
+  async function handleRecurringToggle(id: string, current: boolean) {
+    await updateTransactionRecurring(id, !current)
+    onRecurringChange(id, !current)
   }
 
   if (transactions.length === 0) {
@@ -74,7 +80,15 @@ export default function TransactionList({ transactions, onDelete, onCategoryChan
                               </button>
                             )
                           })}
-                          <button onClick={() => setEditingId(null)} className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-400">취소</button>
+                          <div className="w-full flex items-center gap-2 mt-1">
+                            <button
+                              onClick={() => handleRecurringToggle(tx.id, tx.is_recurring)}
+                              className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.is_recurring ? 'bg-orange-100 text-orange-600 font-semibold' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                            >
+                              {tx.is_recurring ? '고정 ✓' : '고정 아님'}
+                            </button>
+                            <button onClick={() => setEditingId(null)} className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-400">취소</button>
+                          </div>
                         </div>
                       ) : (
                         <>
@@ -84,6 +98,9 @@ export default function TransactionList({ transactions, onDelete, onCategoryChan
                           >
                             {tx.category} ✎
                           </button>
+                          {tx.is_recurring && (
+                            <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
+                          )}
                           {tx.payment_method && (
                             <span className="text-xs text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full shrink-0">{tx.payment_method}</span>
                           )}

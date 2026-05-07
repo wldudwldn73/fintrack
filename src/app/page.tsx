@@ -79,6 +79,10 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, category } : t))
   }
 
+  function handleRecurringChange(id: string, is_recurring: boolean) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, is_recurring } : t))
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-md mx-auto px-4 py-8 space-y-4">
@@ -139,7 +143,7 @@ export default function Home() {
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
         ) : tab === 'list' ? (
-          <TransactionList transactions={transactions} onDelete={handleDelete} onCategoryChange={handleCategoryChange} />
+          <TransactionList transactions={transactions} onDelete={handleDelete} onCategoryChange={handleCategoryChange} onRecurringChange={handleRecurringChange} />
         ) : tab === 'category' ? (
           <CategoryBreakdown transactions={transactions} />
         ) : (

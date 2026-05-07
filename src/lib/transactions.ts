@@ -37,6 +37,11 @@ export async function updateTransactionCategory(id: string, category: string): P
   if (error) throw error
 }
 
+export async function updateTransactionRecurring(id: string, is_recurring: boolean): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ is_recurring }).eq('id', id)
+  if (error) throw error
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', id)
   if (error) throw error
