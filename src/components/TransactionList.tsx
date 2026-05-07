@@ -52,6 +52,9 @@ export default function TransactionList({ transactions, onDelete }: Props) {
                       <span className="text-sm text-gray-700 truncate">{tx.description}</span>
                     )}
                   </div>
+                  {tx.payment_method && (
+                    <p className="text-xs text-gray-400 mt-0.5 ml-0.5">{tx.payment_method}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 ml-3">
                   <span className={`text-sm font-semibold ${tx.type === 'income' ? 'text-blue-600' : 'text-red-500'}`}>

@@ -142,16 +142,19 @@ function parseRows(rows: (string | number | undefined)[][]): ParseResult {
 
     try {
       const date = parseDate(rawDate)
+      const rawDesc = descIdx !== -1 ? String(cols[descIdx] ?? '').trim() : ''
       const description = buildDescription(
-        descIdx !== -1 ? String(cols[descIdx] ?? '') : '',
+        rawDesc,
         merchantIdx !== -1 ? String(cols[merchantIdx] ?? '') : '',
         memoIdx !== -1 ? String(cols[memoIdx] ?? '') : '',
       )
       const type = deposit > 0 ? 'income' : 'expense'
       const amount = deposit > 0 ? deposit : withdraw
       const category = getRuleBasedCategory(description, type) ?? '기타'
+      // rawDesc가 실제 사용처(description)와 다를 때만 결제수단으로 저장
+      const payment_method = rawDesc && rawDesc !== description ? rawDesc : undefined
 
-      transactions.push({ type, amount, category, description: description || undefined, date })
+      transactions.push({ type, amount, category, description: description || undefined, payment_method, date })
     } catch {
       skipped++
     }
