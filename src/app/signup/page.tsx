@@ -39,14 +39,14 @@ export default function SignupPage() {
     }
   }
 
-  async function handleKakao() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'kakao',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'profile_nickname',
-      },
+  function handleKakao() {
+    const params = new URLSearchParams({
+      client_id: process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY!,
+      redirect_uri: `${window.location.origin}/auth/kakao/callback`,
+      response_type: 'code',
+      scope: 'openid profile_nickname profile_image',
     })
+    window.location.href = `https://kauth.kakao.com/oauth/authorize?${params}`
   }
 
   if (done) {
