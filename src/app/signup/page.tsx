@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function SignupPage() {
   const router = useRouter()
+  const [mode, setMode] = useState<'select' | 'email'>('select')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -70,11 +71,58 @@ export default function SignupPage() {
     )
   }
 
+  if (mode === 'select') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm p-8 w-full max-w-sm">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">회원가입</h1>
+          <p className="text-sm text-gray-400 mb-8">Fintrack에 오신 걸 환영해요 💰</p>
+
+          <div className="space-y-3">
+            <button
+              onClick={handleKakao}
+              className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-medium text-[#191919] transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#FEE500' }}
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#191919">
+                <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.73 1.694 5.122 4.238 6.548L5.1 21l4.8-2.7c.68.094 1.378.144 2.1.144 5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/>
+              </svg>
+              카카오로 회원가입
+            </button>
+
+            <button
+              onClick={() => setMode('email')}
+              className="w-full bg-gray-800 text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-700 transition-colors"
+            >
+              이메일로 회원가입
+            </button>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            이미 계정이 있으신가요?{' '}
+            <button
+              onClick={() => router.push('/login')}
+              className="text-gray-700 font-medium"
+            >
+              로그인
+            </button>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">회원가입</h1>
-        <p className="text-sm text-gray-400 mb-8">Fintrack에 오신 걸 환영해요 💰</p>
+        <button
+          onClick={() => setMode('select')}
+          className="text-sm text-gray-400 hover:text-gray-600 mb-6 flex items-center gap-1"
+        >
+          ← 뒤로
+        </button>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">이메일 회원가입</h1>
+        <p className="text-sm text-gray-400 mb-8">이메일과 비밀번호를 입력해주세요</p>
 
         <form onSubmit={handleSignup} className="space-y-3">
           <input
@@ -110,26 +158,9 @@ export default function SignupPage() {
             disabled={loading}
             className="w-full bg-gray-800 text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-40"
           >
-            {loading ? '가입 중...' : '이메일로 회원가입'}
+            {loading ? '가입 중...' : '회원가입'}
           </button>
         </form>
-
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-gray-100" />
-          <span className="text-xs text-gray-400">또는</span>
-          <div className="flex-1 h-px bg-gray-100" />
-        </div>
-
-        <button
-          onClick={handleKakao}
-          className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-medium text-[#191919] transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#FEE500' }}
-        >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#191919">
-            <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.73 1.694 5.122 4.238 6.548L5.1 21l4.8-2.7c.68.094 1.378.144 2.1.144 5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/>
-          </svg>
-          카카오로 회원가입
-        </button>
 
         <p className="text-center text-xs text-gray-400 mt-6">
           이미 계정이 있으신가요?{' '}
