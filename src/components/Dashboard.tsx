@@ -128,6 +128,36 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
         </div>
       </div>
 
+      {/* 고정지출 항목 */}
+      {fixedExpenses.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-800">고정지출 항목</p>
+            <span className="text-xs text-orange-500 font-medium">{fixedExpenses.length}건</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {fixedExpenses
+              .sort((a, b) => b.amount - a.amount)
+              .map(tx => {
+                const cc = getCategoryColor(tx.category)
+                return (
+                  <div key={tx.id} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cc.bg} ${cc.text}`}>{tx.category}</span>
+                      <span className="text-sm text-gray-700 truncate">{tx.description ?? '(내역없음)'}</span>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800 ml-2 shrink-0">{tx.amount.toLocaleString('ko-KR')}원</span>
+                  </div>
+                )
+              })}
+          </div>
+          <div className="px-4 py-3 bg-orange-50 border-t border-orange-100 flex justify-between">
+            <span className="text-xs text-orange-600 font-medium">합계</span>
+            <span className="text-sm font-bold text-orange-600">{fixedTotal.toLocaleString('ko-KR')}원</span>
+          </div>
+        </div>
+      )}
+
       {/* 주별 지출 */}
       <div className="bg-white rounded-2xl px-4 py-5 shadow-sm">
         <p className="text-xs text-gray-400 mb-3">주별 지출</p>
