@@ -46,14 +46,14 @@ export default function TransactionList({ transactions, onDelete }: Props) {
             {txs.map(tx => (
               <div key={tx.id} className="flex items-center px-4 py-3 group">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{tx.category}</span>
-                    {tx.description && (
-                      <span className="text-sm text-gray-700 truncate">{tx.description}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">{tx.category}</span>
+                    {tx.payment_method && (
+                      <span className="text-xs text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full shrink-0">{tx.payment_method}</span>
                     )}
                   </div>
-                  {tx.payment_method && (
-                    <p className="text-xs text-gray-400 mt-0.5 ml-0.5">{tx.payment_method}</p>
+                  {tx.description && (
+                    <p className="text-sm text-gray-800 font-medium mt-0.5 truncate">{tx.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 ml-3">

@@ -142,9 +142,16 @@ export default function CsvImport({ onImport, onClose }: Props) {
                       <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isExcluded ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-800'}`}>
                         {!isExcluded && <span className="text-white text-[10px] leading-none">✓</span>}
                       </div>
-                      <span className="text-xs text-gray-400 shrink-0">{tx.date}</span>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
-                      {tx.description && <span className="text-gray-700 truncate">{tx.description}</span>}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs text-gray-400 shrink-0">{tx.date}</span>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
+                          {tx.description && <span className="text-sm text-gray-800 font-medium truncate">{tx.description}</span>}
+                        </div>
+                        {tx.payment_method && (
+                          <span className="text-xs text-gray-400">{tx.payment_method}</span>
+                        )}
+                      </div>
                     </div>
                     <span className={`ml-2 shrink-0 font-medium ${tx.type === 'income' ? 'text-blue-600' : 'text-red-500'}`}>
                       {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('ko-KR')}원
