@@ -1,12 +1,6 @@
 import Groq from 'groq-sdk'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest } from 'next/server'
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -43,7 +37,8 @@ const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
   }
 ]
 
-async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function executeTool(name: string, args: Record<string, unknown>, supabase: SupabaseClient<any>): Promise<string> {
   if (name === 'delete_transaction') {
     const { error } = await supabase.from('transactions').delete().eq('id', args.id as string)
     return error ? `삭제 실패: ${error.message}` : '삭제 성공'
@@ -58,6 +53,11 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 }
 
 export async function POST(req: NextRequest) {
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   const { message, year, month, history } = await req.json()
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`
@@ -154,7 +154,7 @@ ${txSummary}
 
         for (const tc of toolCallBuffer) {
           const args = JSON.parse(tc.arguments) as Record<string, unknown>
-          const result = await executeTool(tc.name, args)
+          const result = await executeTool(tc.name, args, supabase)
           if (result.includes('성공')) dataChanged = true
           messages.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }

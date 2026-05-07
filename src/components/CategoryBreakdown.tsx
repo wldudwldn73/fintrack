@@ -59,7 +59,7 @@ export default function CategoryBreakdown({ transactions }: Props) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => [`${value.toLocaleString('ko-KR')}원`, '']}
+              formatter={(value) => [`${Number(value).toLocaleString('ko-KR')}원`, '']}
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '13px' }}
             />
           </PieChart>

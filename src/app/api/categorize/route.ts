@@ -1,9 +1,8 @@
 import Groq from 'groq-sdk'
 import { NextRequest } from 'next/server'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
 export async function POST(req: NextRequest) {
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const { transactions } = await req.json()
   if (!transactions?.length) return Response.json({ categories: [] })
 
