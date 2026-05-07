@@ -25,7 +25,7 @@ function parseAmount(raw: string | number | undefined): number {
 
 const DATE_KEYWORDS = ['날짜', '일시', '거래일', '거래일자', '처리일', '거래시간']
 const DESC_KEYWORDS = ['거래내용', '거래내역', '내역', '적요', '기재내용', '내용']
-const MERCHANT_KEYWORDS = ['거래처명', '상호명', '가맹점명', '가맹점', '거래처', '거래명']
+const MERCHANT_KEYWORDS = ['거래처명', '상호명', '가맹점명', '가맹점', '거래처', '거래명', '기재내용', '받는분', '보낸분']
 const MEMO_KEYWORDS = ['메모', '비고']
 const WITHDRAW_KEYWORDS = ['출금', '지출', '인출', '출금액', '출금금액', '찾으신']
 const DEPOSIT_KEYWORDS = ['입금', '수입', '입금액', '입금금액', '맡기신']
