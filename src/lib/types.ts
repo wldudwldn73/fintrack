@@ -7,6 +7,7 @@ export interface Transaction {
   category: string
   description: string | null
   payment_method: string | null
+  institution: string | null
   date: string
   created_at: string
 }
@@ -17,6 +18,7 @@ export interface TransactionInsert {
   category: string
   description?: string
   payment_method?: string
+  institution?: string
   date: string
 }
 

@@ -7,6 +7,7 @@ import TransactionForm from '@/components/TransactionForm'
 import CsvImport from '@/components/CsvImport'
 import ChatModal from '@/components/ChatModal'
 import CategoryBreakdown from '@/components/CategoryBreakdown'
+import Dashboard from '@/components/Dashboard'
 import { Transaction, TransactionInsert } from '@/lib/types'
 import { getTransactions, addTransaction, addTransactions, deleteTransaction } from '@/lib/transactions'
 
@@ -19,7 +20,7 @@ export default function Home() {
   const [showImport, setShowImport] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'list' | 'category'>('list')
+  const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -100,14 +101,22 @@ export default function Home() {
           >
             카테고리별
           </button>
+          <button
+            onClick={() => setTab('dashboard')}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-colors ${tab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+          >
+            대시보드
+          </button>
         </div>
 
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
         ) : tab === 'list' ? (
           <TransactionList transactions={transactions} onDelete={handleDelete} />
-        ) : (
+        ) : tab === 'category' ? (
           <CategoryBreakdown transactions={transactions} />
+        ) : (
+          <Dashboard transactions={transactions} year={year} month={month} />
         )}
       </div>
 
