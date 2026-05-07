@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { parseTossFile, ParseResult } from '@/lib/parseTossFile'
-import { TransactionInsert, RECURRING_CATEGORIES } from '@/lib/types'
+import { TransactionInsert, RECURRING_CATEGORIES, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getTransactionsByDateRange } from '@/lib/transactions'
 
 interface Props {
@@ -15,6 +15,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const [transferIndices, setTransferIndices] = useState<Set<number>>(new Set())
   const [recurringIndices, setRecurringIndices] = useState<Set<number>>(new Set())
+  const [editingCategoryIdx, setEditingCategoryIdx] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [categorizing, setCategorizing] = useState(false)
@@ -122,6 +123,16 @@ export default function CsvImport({ onImport, onClose }: Props) {
     })
   }
 
+  function changeCategory(idx: number, category: string) {
+    setResult(prev => prev ? {
+      ...prev,
+      transactions: prev.transactions.map((t, i) =>
+        i === idx ? { ...t, category, is_recurring: RECURRING_CATEGORIES.has(category) } : t
+      )
+    } : null)
+    setEditingCategoryIdx(null)
+  }
+
   async function handleImport() {
     if (!result) return
     setLoading(true)
@@ -188,14 +199,32 @@ export default function CsvImport({ onImport, onClose }: Props) {
                       <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isExcluded ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-800'}`}>
                         {!isExcluded && <span className="text-white text-[10px] leading-none">✓</span>}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs text-gray-400 shrink-0">{tx.date}</span>
-                          {transferIndices.has(i)
-                            ? <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
-                            : <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
-                          }
-                          {recurringIndices.has(i) && !transferIndices.has(i) && (
+                          {transferIndices.has(i) ? (
+                            <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
+                          ) : editingCategoryIdx === i ? (
+                            <div className="flex flex-wrap gap-1 mt-0.5">
+                              {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
+                                <button
+                                  key={c}
+                                  onClick={() => changeCategory(i, c)}
+                                  className={`text-xs px-2 py-0.5 rounded-full transition-colors ${tx.category === c ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setEditingCategoryIdx(i)}
+                              className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0 hover:bg-gray-200"
+                            >
+                              {tx.category} ✎
+                            </button>
+                          )}
+                          {recurringIndices.has(i) && !transferIndices.has(i) && editingCategoryIdx !== i && (
                             <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
                           )}
                           {tx.description && <span className="text-sm text-gray-800 font-medium truncate">{tx.description}</span>}

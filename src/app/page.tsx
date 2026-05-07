@@ -59,6 +59,10 @@ export default function Home() {
     setTransactions(prev => prev.filter(t => t.id !== id))
   }
 
+  function handleCategoryChange(id: string, category: string) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, category } : t))
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-md mx-auto px-4 py-8 space-y-4">
@@ -112,7 +116,7 @@ export default function Home() {
         {loading ? (
           <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
         ) : tab === 'list' ? (
-          <TransactionList transactions={transactions} onDelete={handleDelete} />
+          <TransactionList transactions={transactions} onDelete={handleDelete} onCategoryChange={handleCategoryChange} />
         ) : tab === 'category' ? (
           <CategoryBreakdown transactions={transactions} />
         ) : (

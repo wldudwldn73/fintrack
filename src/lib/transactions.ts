@@ -32,6 +32,11 @@ export async function addTransactions(txs: TransactionInsert[]): Promise<void> {
   if (error) throw error
 }
 
+export async function updateTransactionCategory(id: string, category: string): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ category }).eq('id', id)
+  if (error) throw error
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', id)
   if (error) throw error
