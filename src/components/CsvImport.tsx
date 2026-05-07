@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { parseTossFile, ParseResult } from '@/lib/parseTossFile'
 import { TransactionInsert } from '@/lib/types'
+import { getTransactionsByDateRange } from '@/lib/transactions'
 
 interface Props {
   onImport: (transactions: TransactionInsert[]) => Promise<void>
@@ -12,6 +13,7 @@ interface Props {
 export default function CsvImport({ onImport, onClose }: Props) {
   const [result, setResult] = useState<ParseResult | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
+  const [transferIndices, setTransferIndices] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [categorizing, setCategorizing] = useState(false)
@@ -22,6 +24,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
     setError(null)
     setResult(null)
     setExcluded(new Set())
+    setTransferIndices(new Set())
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
@@ -54,6 +57,20 @@ export default function CsvImport({ onImport, onClose }: Props) {
           }
         } catch {}
         setCategorizing(false)
+
+        // 이체 감지: DB의 기존 거래와 날짜+금액+반대타입 매칭
+        try {
+          const dates = parsed.transactions.map(t => t.date).sort()
+          const existing = await getTransactionsByDateRange(dates[0], dates[dates.length - 1])
+          const existingKeys = new Set(existing.map(e => `${e.date}|${e.amount}|${e.type}`))
+          const transfers = new Set<number>()
+          parsed.transactions.forEach((t, i) => {
+            const oppositeType = t.type === 'expense' ? 'income' : 'expense'
+            if (existingKeys.has(`${t.date}|${t.amount}|${oppositeType}`)) transfers.add(i)
+          })
+          setTransferIndices(transfers)
+          setExcluded(transfers)
+        } catch {}
       } catch (err) {
         setError(err instanceof Error ? err.message : '파일 파싱 실패')
       }
@@ -145,7 +162,10 @@ export default function CsvImport({ onImport, onClose }: Props) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs text-gray-400 shrink-0">{tx.date}</span>
-                          <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
+                          {transferIndices.has(i)
+                            ? <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
+                            : <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full shrink-0">{tx.category}</span>
+                          }
                           {tx.description && <span className="text-sm text-gray-800 font-medium truncate">{tx.description}</span>}
                         </div>
                         {tx.payment_method && (

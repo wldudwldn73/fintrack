@@ -36,3 +36,13 @@ export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').delete().eq('id', id)
   if (error) throw error
 }
+
+export async function getTransactionsByDateRange(from: string, to: string): Promise<Transaction[]> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .gte('date', from)
+    .lte('date', to)
+  if (error) throw error
+  return data ?? []
+}
