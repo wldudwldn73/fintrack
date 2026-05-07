@@ -10,8 +10,10 @@ import CsvImport from '@/components/CsvImport'
 import ChatModal from '@/components/ChatModal'
 import CategoryBreakdown from '@/components/CategoryBreakdown'
 import Dashboard from '@/components/Dashboard'
+import InsightCards from '@/components/InsightCards'
 import { Transaction, TransactionInsert } from '@/lib/types'
 import { getTransactions, addTransaction, addTransactions, deleteTransaction } from '@/lib/transactions'
+import { generateInsights } from '@/lib/insights'
 
 export default function Home() {
   const now = new Date()
@@ -19,6 +21,7 @@ export default function Home() {
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([])
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -41,8 +44,14 @@ export default function Home() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getTransactions(year, month)
+      const prevY = month === 1 ? year - 1 : year
+      const prevM = month === 1 ? 12 : month - 1
+      const [data, prevData] = await Promise.all([
+        getTransactions(year, month),
+        getTransactions(prevY, prevM),
+      ])
       setTransactions(data)
+      setPrevTransactions(prevData)
     } finally {
       setLoading(false)
     }
@@ -83,6 +92,8 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, is_recurring } : t))
   }
 
+  const insights = generateInsights(transactions, prevTransactions)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-md mx-auto px-4 py-8 space-y-4">
@@ -119,6 +130,8 @@ export default function Home() {
           onNext={nextMonth}
         />
 
+        {!loading && <InsightCards insights={insights} />}
+
         <div className="flex bg-gray-100 rounded-xl p-1">
           <button
             onClick={() => setTab('list')}
@@ -145,7 +158,7 @@ export default function Home() {
         ) : tab === 'list' ? (
           <TransactionList transactions={transactions} onDelete={handleDelete} onCategoryChange={handleCategoryChange} onRecurringChange={handleRecurringChange} />
         ) : tab === 'category' ? (
-          <CategoryBreakdown transactions={transactions} />
+          <CategoryBreakdown transactions={transactions} prevTransactions={prevTransactions} />
         ) : (
           <Dashboard transactions={transactions} year={year} month={month} onCategoryChange={handleCategoryChange} />
         )}

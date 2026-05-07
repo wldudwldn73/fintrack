@@ -1,21 +1,24 @@
 'use client'
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { Transaction } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
+import { getCategoryComment } from '@/lib/insights'
 
 interface Props {
   transactions: Transaction[]
+  prevTransactions: Transaction[]
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
   식비: '🍽', 카페: '☕', 편의점: '🏪', 교통: '🚌', 쇼핑: '🛍', 구독: '📱',
-  주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 급여: '💰', 투자: '📈', 기타: '📦',
+  주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 급여: '💰', 투자: '📈',
+  부업: '💼', 기타: '📦',
 }
 
-export default function CategoryBreakdown({ transactions }: Props) {
+export default function CategoryBreakdown({ transactions, prevTransactions }: Props) {
   const expenses = transactions.filter(t => t.type === 'expense')
-  const totalExpense = expenses.reduce((s, t) => s + t.amount, 0)
+  const prevExpenses = prevTransactions.filter(t => t.type === 'expense')
+  const total = expenses.reduce((s, t) => s + t.amount, 0)
 
   const byCategory = expenses.reduce<Record<string, { amount: number; count: number }>>((acc, t) => {
     if (!acc[t.category]) acc[t.category] = { amount: 0, count: 0 }
@@ -24,83 +27,66 @@ export default function CategoryBreakdown({ transactions }: Props) {
     return acc
   }, {})
 
+  const prevByCategory = prevExpenses.reduce<Record<string, number>>((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount
+    return acc
+  }, {})
+
   const sorted = Object.entries(byCategory).sort((a, b) => b[1].amount - a[1].amount)
-  const chartData = sorted.map(([name, { amount }]) => ({ name, value: amount }))
 
   if (sorted.length === 0) {
     return <div className="text-center py-16 text-gray-400 text-sm">지출 내역이 없어요</div>
   }
 
   return (
-    <div className="space-y-4">
-      {/* 도넛 차트 */}
-      <div className="bg-white rounded-2xl px-4 py-5 shadow-sm">
-        <p className="text-xs text-gray-400 mb-1">이번 달 지출</p>
-        <p className="text-xl font-bold text-gray-900 mb-4">{totalExpense.toLocaleString('ko-KR')}원</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={2}
-              dataKey="value"
-            >
-              {chartData.map((entry, i) => (
-                <Cell key={i} fill={getCategoryColor(entry.name).dot} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value) => [`${Number(value).toLocaleString('ko-KR')}원`, '']}
-              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '13px' }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-
-        {/* 범례 */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 justify-center">
-          {sorted.map(([category]) => (
-            <div key={category} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(category).dot }} />
-              <span className="text-xs text-gray-600">{category}</span>
-            </div>
-          ))}
-        </div>
+    <div className="space-y-3">
+      <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+        <p className="text-xs text-gray-400 mb-0.5">이번 달 총 지출</p>
+        <p className="text-2xl font-bold text-gray-900">{total.toLocaleString('ko-KR')}원</p>
+        <p className="text-xs text-gray-400 mt-1">{sorted.length}개 카테고리</p>
       </div>
 
-      {/* 카테고리별 목록 */}
-      <div className="space-y-2">
-        {sorted.map(([category, { amount, count }], i) => {
-          const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0
-          return (
-            <div key={category} className="bg-white rounded-2xl px-4 py-3.5 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{CATEGORY_EMOJI[category] ?? '📦'}</span>
-                  <div>
-                    <span className="text-sm font-medium text-gray-800">{category}</span>
-                    <span className="text-xs text-gray-400 ml-1.5">{count}건</span>
+      {sorted.map(([category, { amount, count }]) => {
+        const pct = total > 0 ? (amount / total) * 100 : 0
+        const prevAmt = prevByCategory[category]
+        const changePct = prevAmt ? ((amount - prevAmt) / prevAmt) * 100 : null
+        const color = getCategoryColor(category)
+        const comment = getCategoryComment(category, pct, changePct)
+
+        return (
+          <div key={category} className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-gray-100">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">{CATEGORY_EMOJI[category] ?? '📦'}</span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-gray-800">{category}</span>
+                    <span className="text-xs text-gray-400">{count}건</span>
                   </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {amount.toLocaleString('ko-KR')}원
-                  </span>
-                  <span className="text-xs text-gray-400 ml-1.5">{pct.toFixed(0)}%</span>
+                  {comment && <p className="text-xs text-gray-500 mt-0.5">{comment}</p>}
                 </div>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%`, backgroundColor: getCategoryColor(category).dot }}
-                />
+              <div className="text-right shrink-0 ml-2">
+                <p className="text-sm font-bold text-gray-900">{amount.toLocaleString('ko-KR')}원</p>
+                <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                  <span className="text-xs text-gray-400">{pct.toFixed(0)}%</span>
+                  {changePct !== null && (
+                    <span className={`text-xs font-medium ${changePct > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                      {changePct > 0 ? '▲' : '▼'}{Math.abs(changePct).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          )
-        })}
-      </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${pct}%`, backgroundColor: color.dot }}
+              />
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
