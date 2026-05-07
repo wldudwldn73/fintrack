@@ -15,6 +15,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
   const [result, setResult] = useState<ParseResult | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const [transferIndices, setTransferIndices] = useState<Set<number>>(new Set())
+  const [duplicateIndices, setDuplicateIndices] = useState<Set<number>>(new Set())
   const [recurringIndices, setRecurringIndices] = useState<Set<number>>(new Set())
   const [editingCategoryIdx, setEditingCategoryIdx] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,6 +29,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
     setResult(null)
     setExcluded(new Set())
     setTransferIndices(new Set())
+    setDuplicateIndices(new Set())
     setRecurringIndices(new Set())
     const reader = new FileReader()
     reader.onload = async (e) => {
@@ -67,6 +69,14 @@ export default function CsvImport({ onImport, onClose }: Props) {
           const dates = parsed.transactions.map(t => t.date).sort()
           const existing = await getTransactionsByDateRange(dates[0], dates[dates.length - 1])
 
+          // 완전 중복: 같은 날짜 + 금액 + 방향 + 내역
+          const exactKeys = new Set(existing.map(e => `${e.date}|${e.amount}|${e.type}|${e.description ?? ''}`))
+          const duplicates = new Set<number>()
+          parsed.transactions.forEach((t, i) => {
+            if (exactKeys.has(`${t.date}|${t.amount}|${t.type}|${t.description ?? ''}`)) duplicates.add(i)
+          })
+          setDuplicateIndices(duplicates)
+
           // 이체: 같은 날짜 + 금액 + 반대 방향
           const existingKeys = new Set(existing.map(e => `${e.date}|${e.amount}|${e.type}`))
           const transfers = new Set<number>()
@@ -75,7 +85,7 @@ export default function CsvImport({ onImport, onClose }: Props) {
             if (existingKeys.has(`${t.date}|${t.amount}|${oppositeType}`)) transfers.add(i)
           })
           setTransferIndices(transfers)
-          setExcluded(transfers)
+          setExcluded(new Set([...duplicates, ...transfers]))
 
           // 고정지출: 이전 달에도 같은 description이 존재하면 반복 지출로 판단
           const existingDescMonths: Record<string, Set<string>> = {}
@@ -203,7 +213,9 @@ export default function CsvImport({ onImport, onClose }: Props) {
                       <div className="min-w-0 flex-1" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs text-gray-400 shrink-0">{tx.date}</span>
-                          {transferIndices.has(i) ? (
+                          {duplicateIndices.has(i) ? (
+                            <span className="text-xs bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full shrink-0">중복</span>
+                          ) : transferIndices.has(i) ? (
                             <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
                           ) : editingCategoryIdx === i ? (
                             <div className="flex flex-wrap gap-1 mt-0.5">
