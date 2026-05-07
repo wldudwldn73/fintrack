@@ -24,11 +24,35 @@ function parseAmount(raw: string | number | undefined): number {
 
 
 const DATE_KEYWORDS = ['날짜', '일시', '거래일', '거래일자', '처리일', '거래시간']
-const DESC_KEYWORDS = ['내용', '거래내용', '적요', '기재내용', '메모', '거래처', '거래명', '내역']
+const DESC_KEYWORDS = ['거래내용', '거래내역', '내역', '적요', '기재내용', '내용']
+const MERCHANT_KEYWORDS = ['거래처명', '상호명', '가맹점명', '가맹점', '거래처', '거래명']
+const MEMO_KEYWORDS = ['메모', '비고']
 const WITHDRAW_KEYWORDS = ['출금', '지출', '인출', '출금액', '출금금액', '찾으신']
 const DEPOSIT_KEYWORDS = ['입금', '수입', '입금액', '입금금액', '맡기신']
 const TYPE_KEYWORDS = ['구분', '거래구분', '입출금구분', '입출구분', '적요구분']
 const AMOUNT_KEYWORDS = ['금액', '거래금액']
+
+// 은행별로 "체크카드", "오픈뱅킹출금" 같은 일반 거래 구분 앞에 실제 가맹점명이 숨어 있는 경우 정리
+const GENERIC_PREFIX_RE = /^(체크카드|신용카드|카드승인|오픈뱅킹(출금|입금)?|(인터넷|모바일)뱅킹|자동이체|타행이체|계좌이체)\s*/i
+const GENERIC_SUFFIX_RE = /\s*\((체크|신용)카드\)\s*$/i
+
+function buildDescription(desc: string, merchant: string, memo: string): string {
+  const m = merchant.trim()
+  const n = memo.trim()
+  let d = desc.trim()
+
+  // 전용 거래처명 컬럼이 있으면 최우선 사용
+  if (m) return m
+
+  // 일반적인 접두어를 제거해 실제 가맹점명만 추출
+  d = d.replace(GENERIC_PREFIX_RE, '').replace(GENERIC_SUFFIX_RE, '').trim()
+  if (d) return d
+
+  // 접두어만 있었던 경우 메모로 보완
+  if (n) return n
+
+  return desc.trim()
+}
 
 function isHeaderRow(cols: (string | number | undefined)[]): boolean {
   const strs = cols.map(c => String(c ?? ''))
@@ -52,6 +76,8 @@ function findHeaderRowIndex(rows: (string | number | undefined)[][]): number {
 function detectColumns(headers: string[]): {
   dateIdx: number
   descIdx: number
+  merchantIdx: number
+  memoIdx: number
   withdrawIdx: number
   depositIdx: number
   typeIdx: number
@@ -62,6 +88,8 @@ function detectColumns(headers: string[]): {
   return {
     dateIdx: find(...DATE_KEYWORDS),
     descIdx: find(...DESC_KEYWORDS),
+    merchantIdx: find(...MERCHANT_KEYWORDS),
+    memoIdx: find(...MEMO_KEYWORDS),
     withdrawIdx: find(...WITHDRAW_KEYWORDS),
     depositIdx: find(...DEPOSIT_KEYWORDS),
     typeIdx: find(...TYPE_KEYWORDS),
@@ -79,7 +107,7 @@ function parseRows(rows: (string | number | undefined)[][]): ParseResult {
   if (headerIdx === -1) throw new Error('헤더 행을 찾을 수 없습니다. 거래내역 파일인지 확인해주세요.')
 
   const headers = rows[headerIdx].map(h => String(h ?? '').trim())
-  const { dateIdx, descIdx, withdrawIdx, depositIdx, typeIdx, amountIdx } = detectColumns(headers)
+  const { dateIdx, descIdx, merchantIdx, memoIdx, withdrawIdx, depositIdx, typeIdx, amountIdx } = detectColumns(headers)
 
   if (dateIdx === -1) throw new Error('날짜 열을 찾을 수 없습니다.')
 
@@ -114,7 +142,11 @@ function parseRows(rows: (string | number | undefined)[][]): ParseResult {
 
     try {
       const date = parseDate(rawDate)
-      const description = descIdx !== -1 ? String(cols[descIdx] ?? '') : ''
+      const description = buildDescription(
+        descIdx !== -1 ? String(cols[descIdx] ?? '') : '',
+        merchantIdx !== -1 ? String(cols[merchantIdx] ?? '') : '',
+        memoIdx !== -1 ? String(cols[memoIdx] ?? '') : '',
+      )
       const type = deposit > 0 ? 'income' : 'expense'
       const amount = deposit > 0 ? deposit : withdraw
       const category = getRuleBasedCategory(description, type) ?? '기타'
