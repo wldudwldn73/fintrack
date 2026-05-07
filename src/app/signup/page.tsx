@@ -42,7 +42,10 @@ export default function SignupPage() {
   async function handleKakao() {
     await supabase.auth.signInWithOAuth({
       provider: 'kakao',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: 'profile_nickname',
+      },
     })
   }
 
