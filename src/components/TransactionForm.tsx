@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TransactionInsert, TransactionType, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
+import { getRuleBasedCategory } from '@/lib/categoryRules'
 
 interface Props {
   onSubmit: (tx: TransactionInsert) => Promise<void>
@@ -17,6 +18,12 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   const [loading, setLoading] = useState(false)
 
   const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
+
+  useEffect(() => {
+    if (!description || category) return
+    const suggested = getRuleBasedCategory(description, type)
+    if (suggested) setCategory(suggested)
+  }, [description, type])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

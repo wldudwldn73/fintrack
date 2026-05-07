@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { TransactionInsert } from './types'
+import { getRuleBasedCategory } from './categoryRules'
 
 function parseDate(raw: string | number): string {
   if (typeof raw === 'number') {
@@ -21,22 +22,6 @@ function parseAmount(raw: string | number | undefined): number {
   return Number(String(raw).replace(/[,\s원+\-]/g, '')) || 0
 }
 
-function guessCategory(description: string, type: 'income' | 'expense'): string {
-  const desc = description.toLowerCase()
-  if (type === 'income') {
-    if (desc.includes('급여') || desc.includes('월급')) return '급여'
-    if (desc.includes('이자') || desc.includes('배당') || desc.includes('주식')) return '투자'
-    return '기타'
-  }
-  if (desc.includes('스타벅스') || desc.includes('카페') || desc.includes('커피') || desc.includes('편의점') || desc.includes('마트') || desc.includes('식당') || desc.includes('배달')) return '식비'
-  if (desc.includes('지하철') || desc.includes('버스') || desc.includes('택시') || desc.includes('주유') || desc.includes('ktx') || desc.includes('기차')) return '교통'
-  if (desc.includes('쿠팡') || desc.includes('네이버') || desc.includes('11번가') || desc.includes('g마켓') || desc.includes('올리브')) return '쇼핑'
-  if (desc.includes('월세') || desc.includes('관리비') || desc.includes('전기') || desc.includes('가스') || desc.includes('수도')) return '주거'
-  if (desc.includes('병원') || desc.includes('약국') || desc.includes('의원') || desc.includes('클리닉')) return '의료'
-  if (desc.includes('영화') || desc.includes('넷플릭스') || desc.includes('유튜브') || desc.includes('게임') || desc.includes('문화')) return '문화'
-  if (desc.includes('학원') || desc.includes('교육') || desc.includes('책') || desc.includes('도서')) return '교육'
-  return '기타'
-}
 
 const DATE_KEYWORDS = ['날짜', '일시', '거래일', '거래일자', '처리일', '거래시간']
 const DESC_KEYWORDS = ['내용', '거래내용', '적요', '기재내용', '메모', '거래처', '거래명', '내역']
@@ -132,7 +117,7 @@ function parseRows(rows: (string | number | undefined)[][]): ParseResult {
       const description = descIdx !== -1 ? String(cols[descIdx] ?? '') : ''
       const type = deposit > 0 ? 'income' : 'expense'
       const amount = deposit > 0 ? deposit : withdraw
-      const category = guessCategory(description, type)
+      const category = getRuleBasedCategory(description, type) ?? '기타'
 
       transactions.push({ type, amount, category, description: description || undefined, date })
     } catch {
