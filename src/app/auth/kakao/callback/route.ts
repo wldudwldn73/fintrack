@@ -44,13 +44,23 @@ export async function GET(request: NextRequest) {
     }
   )
 
-  const { error } = await supabase.auth.signInWithIdToken({
+  const { data: authData, error } = await supabase.auth.signInWithIdToken({
     provider: 'kakao',
     token: tokens.id_token,
   })
 
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`)
+  }
+
+  const { data: profile } = await supabase
+    .from('tb_user_mst')
+    .select('onboarding_completed')
+    .eq('id', authData.user.id)
+    .single()
+
+  if (!profile?.onboarding_completed) {
+    return NextResponse.redirect(`${origin}/onboarding`)
   }
 
   return NextResponse.redirect(`${origin}/`)

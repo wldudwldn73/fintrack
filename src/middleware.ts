@@ -25,12 +25,27 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPath = request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup') ||
-    request.nextUrl.pathname.startsWith('/auth')
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/onboarding')
 
   if (!user && !isAuthPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  if (user && request.nextUrl.pathname === '/') {
+    const { data: profile } = await supabase
+      .from('tb_user_mst')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .single()
+
+    if (profile && !profile.onboarding_completed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/onboarding'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

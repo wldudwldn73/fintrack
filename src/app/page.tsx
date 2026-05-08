@@ -127,7 +127,7 @@ export default function Home() {
               <span className="ai-badge text-xs px-2 py-0.5 rounded-full text-indigo-300 font-semibold">AI</span>
             </div>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {user?.email?.split('@')[0] ?? ''}님의 스마트 가계부
+              {user?.user_metadata?.name ?? user?.user_metadata?.username ?? user?.email?.split('@')[0] ?? ''}님의 스마트 가계부
             </p>
           </div>
           <div className="flex items-center gap-2">

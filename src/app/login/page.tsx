@@ -4,9 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+function toFakeEmail(username: string) {
+  return `${username.toLowerCase().trim()}@id.fintrack.app`
+}
+
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -16,13 +20,16 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email: toFakeEmail(username),
+        password,
+      })
       if (error) throw error
       router.push('/')
     } catch (err) {
       const msg = err instanceof Error ? err.message : '오류가 발생했어요'
-      if (msg.includes('Invalid login')) setError('이메일 또는 비밀번호가 올바르지 않아요')
-      else if (msg.includes('Email not confirmed')) setError('이메일 인증을 먼저 완료해주세요')
+      if (msg.includes('Invalid login')) setError('아이디 또는 비밀번호가 올바르지 않아요')
+      else if (msg.includes('Email not confirmed')) setError('계정 인증이 필요해요. 관리자에게 문의해주세요.')
       else setError(msg)
     } finally {
       setLoading(false)
@@ -44,7 +51,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 anim-up">
-        {/* Logo */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2.5 mb-2">
             <span className="text-3xl font-bold gradient-text tracking-tight">Fintrack</span>
@@ -53,16 +59,16 @@ export default function LoginPage() {
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI가 분석하는 스마트 가계부</p>
         </div>
 
-        {/* Card */}
         <div className="glass rounded-2xl p-7 glow-indigo space-y-4">
           <form onSubmit={handleLogin} className="space-y-3">
             <input
-              type="email"
-              placeholder="이메일"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              placeholder="아이디"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               className={INPUT_CLASS}
               required
+              autoComplete="username"
             />
             <input
               type="password"
