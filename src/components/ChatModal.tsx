@@ -62,7 +62,7 @@ export default function ChatModal({ year, month, onClose, onDataChange }: Props)
         }),
       })
 
-      const reader = res.body!.getReader()
+      const reader  = res.body!.getReader()
       const decoder = new TextDecoder()
 
       while (true) {
@@ -70,9 +70,7 @@ export default function ChatModal({ year, month, onClose, onDataChange }: Props)
         if (done) break
         const chunk = decoder.decode(value)
 
-        if (chunk.includes('[DATA_CHANGED]')) {
-          dataChangedRef.current = true
-        }
+        if (chunk.includes('[DATA_CHANGED]')) dataChangedRef.current = true
 
         const cleanChunk = chunk.replace('\n[DATA_CHANGED]', '').replace('[DATA_CHANGED]', '')
         if (cleanChunk) {
@@ -99,36 +97,53 @@ export default function ChatModal({ year, month, onClose, onDataChange }: Props)
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg flex flex-col h-[75vh] sm:h-[600px]" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="font-semibold text-gray-900">AI 가계부 분석</h3>
-            <p className="text-xs text-gray-400">{year}년 {month}월 · 수정·삭제 가능</p>
+    <div className="fixed inset-0 bg-black/65 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4" onClick={onClose}>
+      <div
+        className="glass rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg flex flex-col h-[78vh] sm:h-[600px] glow-indigo"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl ai-badge flex items-center justify-center">
+              <span className="pulse-dot inline-block w-2 h-2 rounded-full bg-indigo-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">AI 가계부 분석</h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{year}년 {month}월 · 수정·삭제 가능</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {messages.length > 0 && (
               <button
                 onClick={() => setMessages([])}
-                className="text-xs text-gray-400 hover:text-gray-600"
+                className="text-xs transition-colors hover:text-white/70"
+                style={{ color: 'var(--text-muted)' }}
               >
-                대화 초기화
+                초기화
               </button>
             )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl transition-colors">×</button>
           </div>
         </div>
 
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {messages.length === 0 && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500 text-center">이번 달 지출에 대해 물어보거나 수정을 요청해보세요</p>
+            <div className="space-y-4 pt-4">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-2xl ai-badge flex items-center justify-center mx-auto mb-3">
+                  <span className="text-xl">🤖</span>
+                </div>
+                <p className="text-sm text-white/60">이번 달 지출에 대해 물어보거나</p>
+                <p className="text-sm text-white/60">수정을 요청해보세요</p>
+              </div>
               <div className="flex flex-wrap gap-2 justify-center">
                 {SUGGESTIONS.map(s => (
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full transition-colors"
+                    className="text-xs glass-sm text-white/60 hover:text-white/90 px-3 py-1.5 rounded-full transition-all hover:scale-105"
                   >
                     {s}
                   </button>
@@ -139,11 +154,14 @@ export default function ChatModal({ year, month, onClose, onDataChange }: Props)
 
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-gray-800 text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-sm'
-              }`}>
+              <div
+                className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'text-white rounded-br-sm'
+                    : 'glass-sm text-white/85 rounded-bl-sm'
+                }`}
+                style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #4f46e5)' } : {}}
+              >
                 {msg.content || <span className="opacity-40">▍</span>}
               </div>
             </div>
@@ -151,21 +169,23 @@ export default function ChatModal({ year, month, onClose, onDataChange }: Props)
           <div ref={bottomRef} />
         </div>
 
-        <div className="px-4 pb-4 pt-2 border-t border-gray-100">
+        {/* Input */}
+        <div className="px-4 pb-5 pt-3 border-t border-white/8">
           <div className="flex gap-2">
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send(input)}
-              placeholder="질문하거나 수정 요청을 해보세요..."
+              placeholder="질문하거나 수정을 요청해보세요..."
               disabled={loading}
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50"
+              className="flex-1 glass rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 disabled:opacity-50 transition-all"
             />
             <button
               onClick={() => send(input)}
               disabled={loading || !input.trim()}
-              className="px-4 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium disabled:opacity-40"
+              className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-35 transition-all hover:scale-105 active:scale-95 glow-indigo"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
             >
               전송
             </button>

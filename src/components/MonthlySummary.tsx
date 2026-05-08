@@ -11,40 +11,70 @@ interface Props {
 }
 
 export default function MonthlySummary({ transactions, year, month, onPrev, onNext }: Props) {
-  const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-  const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const income  = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const balance = income - expense
+  const savingRate = income > 0 ? Math.round((balance / income) * 100) : null
 
-  const fmt = (n: number) => n.toLocaleString('ko-KR') + '원'
+  const fmt = (n: number) => n.toLocaleString('ko-KR')
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <button onClick={onPrev} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          &#8249;
+    <div className="glass rounded-2xl p-5 glow-indigo relative overflow-hidden">
+      {/* Decorative blobs */}
+      <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full blur-3xl pointer-events-none opacity-20"
+        style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+      <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-3xl pointer-events-none opacity-15"
+        style={{ background: 'radial-gradient(circle, #22d3ee, transparent)' }} />
+
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-5 relative">
+        <button
+          onClick={onPrev}
+          className="glass-sm w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-white/50 hover:text-white text-lg"
+        >
+          ‹
         </button>
-        <h2 className="text-lg font-semibold text-gray-800">
-          {year}년 {month}월
-        </h2>
-        <button onClick={onNext} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          &#8250;
+        <div className="text-center">
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{year}년</p>
+          <h2 className="text-xl font-bold text-white">{month}월</h2>
+        </div>
+        <button
+          onClick={onNext}
+          className="glass-sm w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 text-white/50 hover:text-white text-lg"
+        >
+          ›
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">수입</p>
-          <p className="text-base font-semibold text-blue-600">{fmt(income)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">지출</p>
-          <p className="text-base font-semibold text-red-500">{fmt(expense)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">잔액</p>
-          <p className={`text-base font-semibold ${balance >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
-            {fmt(balance)}
+      {/* Balance hero */}
+      <div className="text-center mb-5 relative">
+        <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>순 잔액</p>
+        <p className={`text-3xl font-bold tracking-tight ${
+          balance >= 0 ? 'text-emerald-300 text-glow-emerald' : 'text-rose-300 text-glow-rose'
+        }`}>
+          {balance >= 0 ? '+' : ''}{fmt(balance)}원
+        </p>
+        {savingRate !== null && (
+          <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+            저축률{' '}
+            <span className={`font-semibold ${
+              savingRate >= 20 ? 'text-emerald-400' : savingRate >= 0 ? 'text-amber-400' : 'text-rose-400'
+            }`}>
+              {savingRate}%
+            </span>
           </p>
+        )}
+      </div>
+
+      {/* Income / Expense */}
+      <div className="grid grid-cols-2 gap-3 relative">
+        <div className="glass-sm rounded-xl px-4 py-3 text-center">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>수입</p>
+          <p className="text-sm font-bold text-cyan-300 text-glow-cyan">{fmt(income)}원</p>
+        </div>
+        <div className="glass-sm rounded-xl px-4 py-3 text-center">
+          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>지출</p>
+          <p className="text-sm font-bold text-rose-300 text-glow-rose">{fmt(expense)}원</p>
         </div>
       </div>
     </div>

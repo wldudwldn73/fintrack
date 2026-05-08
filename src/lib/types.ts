@@ -9,6 +9,8 @@ export interface Transaction {
   payment_method: string | null
   institution: string | null
   is_recurring: boolean
+  is_excluded: boolean
+  deleted: boolean
   date: string
   created_at: string
 }
@@ -22,6 +24,21 @@ export interface TransactionInsert {
   institution?: string
   is_recurring?: boolean
   date: string
+}
+
+export interface Budget {
+  id: string
+  year: number
+  month: number
+  category: string
+  amount: number
+}
+
+export interface BudgetUpsert {
+  year: number
+  month: number
+  category: string
+  amount: number
 }
 
 // 카테고리만으로 고정지출 확정 가능한 경우

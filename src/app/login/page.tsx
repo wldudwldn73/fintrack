@@ -39,63 +39,77 @@ export default function LoginPage() {
     window.location.href = `https://kauth.kakao.com/oauth/authorize?${params}`
   }
 
+  const INPUT_CLASS = 'w-full glass rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all'
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl shadow-sm p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Fintrack 💰</h1>
-        <p className="text-sm text-gray-400 mb-8">내 가계부에 로그인하세요</p>
-
-        <form onSubmit={handleLogin} className="space-y-3">
-          <input
-            type="email"
-            placeholder="이메일"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
-            required
-          />
-          <input
-            type="password"
-            placeholder="비밀번호"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors"
-            required
-          />
-
-          {error && <p className="text-xs text-red-500 px-1">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gray-800 text-white rounded-xl py-3 text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-40"
-          >
-            {loading ? '로그인 중...' : '로그인'}
-          </button>
-        </form>
-
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-gray-100" />
-          <span className="text-xs text-gray-400">또는</span>
-          <div className="flex-1 h-px bg-gray-100" />
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm space-y-6 anim-up">
+        {/* Logo */}
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2.5 mb-2">
+            <span className="text-3xl font-bold gradient-text tracking-tight">Fintrack</span>
+            <span className="ai-badge text-xs px-2 py-0.5 rounded-full text-indigo-300 font-semibold">AI</span>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>AI가 분석하는 스마트 가계부</p>
         </div>
 
-        <button
-          onClick={handleKakao}
-          className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-medium text-[#191919] transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#FEE500' }}
-        >
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#191919">
-            <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.73 1.694 5.122 4.238 6.548L5.1 21l4.8-2.7c.68.094 1.378.144 2.1.144 5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/>
-          </svg>
-          카카오로 로그인
-        </button>
+        {/* Card */}
+        <div className="glass rounded-2xl p-7 glow-indigo space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3">
+            <input
+              type="email"
+              placeholder="이메일"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className={INPUT_CLASS}
+              required
+            />
+            <input
+              type="password"
+              placeholder="비밀번호"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className={INPUT_CLASS}
+              required
+            />
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+            {error && (
+              <p className="text-xs text-rose-400 px-1">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-35 transition-all hover:scale-[1.02] active:scale-[0.98] glow-indigo"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+            >
+              {loading ? '로그인 중...' : '로그인'}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>또는</span>
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          </div>
+
+          <button
+            onClick={handleKakao}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 text-sm font-semibold text-[#191919] transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ backgroundColor: '#FEE500' }}
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#191919">
+              <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.73 1.694 5.122 4.238 6.548L5.1 21l4.8-2.7c.68.094 1.378.144 2.1.144 5.523 0 10-3.477 10-7.8S17.523 3 12 3z" />
+            </svg>
+            카카오로 로그인
+          </button>
+        </div>
+
+        <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
           계정이 없으신가요?{' '}
           <button
             onClick={() => router.push('/signup')}
-            className="text-gray-700 font-medium"
+            className="text-indigo-400 font-semibold hover:text-indigo-300 transition-colors"
           >
             회원가입
           </button>

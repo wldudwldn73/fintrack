@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import { TransactionInsert, TransactionType, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getRuleBasedCategory } from '@/lib/categoryRules'
+import { getCategoryColor } from '@/lib/categoryColors'
 
 interface Props {
   onSubmit: (tx: TransactionInsert) => Promise<void>
   onClose: () => void
 }
+
+const INPUT_CLASS = 'w-full glass rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all'
 
 export default function TransactionForm({ onSubmit, onClose }: Props) {
   const [type, setType] = useState<TransactionType>('expense')
@@ -28,7 +31,6 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!amount || !category) return
-
     setLoading(true)
     try {
       await onSubmit({ type, amount: Number(amount), category, description: description || undefined, date })
@@ -39,21 +41,30 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6" onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-gray-800 mb-5">내역 추가</h3>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-0 sm:px-4" onClick={onClose}>
+      <div
+        className="glass rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-6 glow-indigo"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-white">내역 추가</h3>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl transition-colors">×</button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Type toggle */}
           <div className="flex gap-2">
             {(['expense', 'income'] as const).map(t => (
               <button
                 key={t}
                 type="button"
                 onClick={() => { setType(t); setCategory('') }}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   type === t
-                    ? t === 'expense' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-600'
+                    ? t === 'expense'
+                      ? 'bg-rose-500/80 text-white glow-rose'
+                      : 'bg-cyan-500/70 text-white glow-cyan'
+                    : 'glass-sm text-white/45 hover:text-white/70'
                 }`}
               >
                 {t === 'expense' ? '지출' : '수입'}
@@ -61,54 +72,69 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
             ))}
           </div>
 
+          {/* Amount */}
           <input
             type="number"
             placeholder="금액"
             value={amount}
             onChange={e => setAmount(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className={INPUT_CLASS}
             required
           />
 
-          <div className="flex flex-wrap gap-2">
-            {categories.map(c => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(c)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  category === c ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+          {/* Category chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map(c => {
+              const cc = getCategoryColor(c)
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    category === c
+                      ? `${cc.bg} ${cc.text} ring-1 ring-white/15 scale-105`
+                      : 'glass-sm text-white/45 hover:text-white/70'
+                  }`}
+                >
+                  {c}
+                </button>
+              )
+            })}
           </div>
 
+          {/* Description */}
           <input
             type="text"
             placeholder="메모 (선택)"
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className={INPUT_CLASS}
           />
 
+          {/* Date */}
           <input
             type="date"
             value={date}
             onChange={e => setDate(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className={INPUT_CLASS}
             required
           />
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium">
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl glass-sm text-white/50 text-sm font-medium hover:text-white/80 transition-colors"
+            >
               취소
             </button>
             <button
               type="submit"
               disabled={loading || !amount || !category}
-              className="flex-1 py-3 rounded-lg bg-gray-800 text-white text-sm font-medium disabled:opacity-40"
+              className="flex-1 py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-35 transition-all hover:scale-[1.02] active:scale-[0.98] glow-indigo"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
             >
               {loading ? '저장 중...' : '저장'}
             </button>
