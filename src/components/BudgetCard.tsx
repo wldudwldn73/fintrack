@@ -30,8 +30,6 @@ const CATEGORY_EMOJI: Record<string, string> = {
   보험: '🛡', 적금: '🏦', 기부금: '🤝', 기타: '📦',
 }
 
-// 일반적으로 고정되는 카테고리
-const FIXED_CATEGORY_LIST = ['주거', '교통', '보험', '적금', '구독', '교육', '의료', '기부금']
 
 export default function BudgetCard({ transactions, budgets, year, month, onBudgetsChange }: Props) {
   const [editing, setEditing] = useState(false)
@@ -196,9 +194,9 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
           {/* 고정 지출 입력 */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 (바꿀 수 없는 항목만 입력)</p>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 (바꿀 수 없는 항목만 입력, 나머지는 비워두세요)</p>
             <div className="grid grid-cols-2 gap-1.5">
-              {FIXED_CATEGORY_LIST.map(cat => (
+              {EXPENSE_CATEGORIES.map(cat => (
                 <div key={cat} className="flex items-center gap-1.5">
                   <span className="text-xs w-4 text-center shrink-0">{CATEGORY_EMOJI[cat]}</span>
                   <span className="text-xs w-9 shrink-0" style={{ color: 'var(--text-muted)' }}>{cat}</span>
