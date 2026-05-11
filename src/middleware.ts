@@ -26,7 +26,8 @@ export async function middleware(request: NextRequest) {
   const isAuthPath = request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup') ||
     request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/onboarding')
+    request.nextUrl.pathname.startsWith('/onboarding') ||
+    request.nextUrl.pathname.startsWith('/api/')
 
   if (!user && !isAuthPath) {
     const url = request.nextUrl.clone()
