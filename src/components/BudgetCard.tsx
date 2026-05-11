@@ -22,7 +22,8 @@ interface AiSuggestion {
 
 const CATEGORY_EMOJI: Record<string, string> = {
   식비: '🍽', 카페: '☕', 편의점: '🏪', 교통: '🚌', 쇼핑: '🛍', 구독: '📱',
-  주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 투자: '📈', 기타: '📦',
+  주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 투자: '📈',
+  보험: '🛡', 적금: '🏦', 기부금: '🤝', 기타: '📦',
 }
 
 export default function BudgetCard({ transactions, budgets, year, month, onBudgetsChange }: Props) {

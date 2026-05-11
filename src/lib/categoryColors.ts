@@ -12,6 +12,9 @@ export const CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: st
   급여:   { bg: 'bg-emerald-500/15', text: 'text-emerald-400',  dot: '#10b981' },
   부업:   { bg: 'bg-lime-500/15',    text: 'text-lime-400',     dot: '#84cc16' },
   투자:   { bg: 'bg-cyan-500/15',    text: 'text-cyan-400',     dot: '#06b6d4' },
+  보험:   { bg: 'bg-sky-500/15',     text: 'text-sky-400',      dot: '#0ea5e9' },
+  적금:   { bg: 'bg-violet-500/15',  text: 'text-violet-400',   dot: '#8b5cf6' },
+  기부금: { bg: 'bg-rose-500/15',    text: 'text-rose-400',     dot: '#f43f5e' },
   기타:   { bg: 'bg-zinc-500/15',    text: 'text-zinc-400',     dot: '#9ca3af' },
 }
 
