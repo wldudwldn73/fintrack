@@ -12,7 +12,7 @@ interface Props {
 const CATEGORY_EMOJI: Record<string, string> = {
   식비: '🍽', 카페: '☕', 편의점: '🏪', 교통: '🚌', 쇼핑: '🛍', 구독: '📱',
   주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 급여: '💰', 투자: '📈',
-  부업: '💼', 기타: '📦',
+  부업: '💼', 보험: '🛡', 적금: '🏦', 기부금: '🤝', 기타: '📦',
 }
 
 export default function CategoryBreakdown({ transactions, prevTransactions }: Props) {
