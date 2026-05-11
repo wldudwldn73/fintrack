@@ -50,10 +50,19 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
   const totalActual = expenses.reduce((s, t) => s + t.amount, 0)
   const totalBudget = budgets.reduce((s, b) => s + b.amount, 0)
 
+  function toManwon(won: number) {
+    const v = Math.round(won / 1000) / 10
+    return v % 1 === 0 ? v.toString() : v.toString()
+  }
+
+  function fromManwon(val: string) {
+    return Math.round(parseFloat(val.replace(/,/g, '')) * 10000)
+  }
+
   function startEditing() {
     const init: Record<string, string> = {}
     for (const b of budgets) {
-      init[b.category] = Math.round(b.amount / 10000).toString()
+      init[b.category] = toManwon(b.amount)
     }
     setEditValues(init)
     setEditing(true)
@@ -62,14 +71,14 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
   function getFixedExpenses(): Record<string, number> {
     const result: Record<string, number> = {}
     for (const [cat, val] of Object.entries(fixedValues)) {
-      const n = parseInt(val.replace(/,/g, ''), 10)
-      if (!isNaN(n) && n > 0) result[cat] = n * 10000
+      const n = fromManwon(val)
+      if (!isNaN(n) && n > 0) result[cat] = n
     }
     return result
   }
 
   async function handleAiSuggest() {
-    const salaryNum = parseInt(salary.replace(/,/g, ''), 10) * 10000
+    const salaryNum = fromManwon(salary)
     if (isNaN(salaryNum) || salaryNum <= 0) return
 
     setAiLoading(true)
@@ -85,13 +94,13 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
       const filled: Record<string, string> = {}
       for (const [cat, amount] of Object.entries(data.budget)) {
         if (EXPENSE_CATEGORIES.includes(cat as never) && amount > 0) {
-          filled[cat] = Math.round(amount / 10000).toString()
+          filled[cat] = toManwon(amount)
         }
       }
       // 고정 항목은 fixedValues 우선
       for (const [cat, val] of Object.entries(fixedValues)) {
-        const n = parseInt(val.replace(/,/g, ''), 10)
-        if (!isNaN(n) && n > 0) filled[cat] = n.toString()
+        const n = fromManwon(val)
+        if (!isNaN(n) && n > 0) filled[cat] = val
       }
       setEditValues(prev => ({ ...prev, ...filled }))
     } finally {
@@ -106,7 +115,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
       // 변동 예산 저장 (만원 → 원 변환)
       for (const [category, val] of Object.entries(editValues)) {
-        const amount = parseInt(val.replace(/,/g, ''), 10) * 10000
+        const amount = fromManwon(val)
         if (isNaN(amount) || amount < 0) continue
         if (amount === 0) {
           const existing = budgets.find(b => b.category === category)
@@ -121,7 +130,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
       // 고정 예산 저장 (만원 → 원 변환, editValues에 없는 것만)
       for (const [category, val] of Object.entries(fixedValues)) {
         if (category in editValues) continue
-        const amount = parseInt(val.replace(/,/g, ''), 10) * 10000
+        const amount = fromManwon(val)
         if (isNaN(amount) || amount <= 0) continue
         await upsertBudget({ year, month, category, amount })
         const existing = budgets.find(b => b.category === category)
@@ -161,7 +170,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
   if (editing) {
     const fixedTotal = Object.values(getFixedExpenses()).reduce((s, v) => s + v, 0)
-    const salaryNum = (parseInt(salary.replace(/,/g, ''), 10) || 0) * 10000
+    const salaryNum = fromManwon(salary) || 0
     const disposable = salaryNum > 0 ? salaryNum - fixedTotal : 0
 
     return (
@@ -184,7 +193,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
             <span className="text-xs shrink-0 w-8" style={{ color: 'var(--text-muted)' }}>월급</span>
             <input
               type="number"
-              placeholder="예: 230"
+              placeholder="예: 230 또는 14.5"
               value={salary}
               onChange={e => setSalary(e.target.value)}
               className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
@@ -194,7 +203,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
           {/* 고정 지출 입력 */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 — 해당 항목만 입력 (단위: 만원)</p>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 — 해당 항목만 입력 (만원, 소수점 가능: 14.5 = 145,000원)</p>
             <div className="grid grid-cols-2 gap-1.5">
               {EXPENSE_CATEGORIES.map(cat => (
                 <div key={cat} className="flex items-center gap-1.5">
