@@ -53,7 +53,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
   function startEditing() {
     const init: Record<string, string> = {}
     for (const b of budgets) {
-      init[b.category] = b.amount.toString()
+      init[b.category] = Math.round(b.amount / 10000).toString()
     }
     setEditValues(init)
     setEditing(true)
@@ -63,13 +63,13 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
     const result: Record<string, number> = {}
     for (const [cat, val] of Object.entries(fixedValues)) {
       const n = parseInt(val.replace(/,/g, ''), 10)
-      if (!isNaN(n) && n > 0) result[cat] = n
+      if (!isNaN(n) && n > 0) result[cat] = n * 10000
     }
     return result
   }
 
   async function handleAiSuggest() {
-    const salaryNum = parseInt(salary.replace(/,/g, ''), 10)
+    const salaryNum = parseInt(salary.replace(/,/g, ''), 10) * 10000
     if (isNaN(salaryNum) || salaryNum <= 0) return
 
     setAiLoading(true)
@@ -85,7 +85,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
       const filled: Record<string, string> = {}
       for (const [cat, amount] of Object.entries(data.budget)) {
         if (EXPENSE_CATEGORIES.includes(cat as never) && amount > 0) {
-          filled[cat] = amount.toString()
+          filled[cat] = Math.round(amount / 10000).toString()
         }
       }
       // 고정 항목은 fixedValues 우선
@@ -104,9 +104,9 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
     try {
       const savedBudgets: Budget[] = []
 
-      // 변동 예산 저장
+      // 변동 예산 저장 (만원 → 원 변환)
       for (const [category, val] of Object.entries(editValues)) {
-        const amount = parseInt(val.replace(/,/g, ''), 10)
+        const amount = parseInt(val.replace(/,/g, ''), 10) * 10000
         if (isNaN(amount) || amount < 0) continue
         if (amount === 0) {
           const existing = budgets.find(b => b.category === category)
@@ -118,10 +118,10 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
         }
       }
 
-      // 고정 예산 저장 (editValues에 없는 것만)
+      // 고정 예산 저장 (만원 → 원 변환, editValues에 없는 것만)
       for (const [category, val] of Object.entries(fixedValues)) {
         if (category in editValues) continue
-        const amount = parseInt(val.replace(/,/g, ''), 10)
+        const amount = parseInt(val.replace(/,/g, ''), 10) * 10000
         if (isNaN(amount) || amount <= 0) continue
         await upsertBudget({ year, month, category, amount })
         const existing = budgets.find(b => b.category === category)
@@ -161,7 +161,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
   if (editing) {
     const fixedTotal = Object.values(getFixedExpenses()).reduce((s, v) => s + v, 0)
-    const salaryNum = parseInt(salary.replace(/,/g, ''), 10) || 0
+    const salaryNum = (parseInt(salary.replace(/,/g, ''), 10) || 0) * 10000
     const disposable = salaryNum > 0 ? salaryNum - fixedTotal : 0
 
     return (
@@ -184,17 +184,17 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
             <span className="text-xs shrink-0 w-8" style={{ color: 'var(--text-muted)' }}>월급</span>
             <input
               type="number"
-              placeholder="세후 월 소득"
+              placeholder="예: 230"
               value={salary}
               onChange={e => setSalary(e.target.value)}
               className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
             />
-            <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>원</span>
+            <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>만원</span>
           </div>
 
           {/* 고정 지출 입력 */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 (바꿀 수 없는 항목만 입력, 나머지는 비워두세요)</p>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 — 해당 항목만 입력 (단위: 만원)</p>
             <div className="grid grid-cols-2 gap-1.5">
               {EXPENSE_CATEGORIES.map(cat => (
                 <div key={cat} className="flex items-center gap-1.5">
@@ -207,15 +207,18 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
                     onChange={e => setFixedValues(v => ({ ...v, [cat]: e.target.value }))}
                     className="flex-1 min-w-0 glass-sm rounded-md px-2 py-1 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
                   />
+                  <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>만</span>
                 </div>
               ))}
             </div>
             {/* 가용소득 계산 표시 */}
             {salaryNum > 0 && fixedTotal > 0 && (
               <div className="flex items-center justify-between text-xs pt-1 px-0.5">
-                <span style={{ color: 'var(--text-muted)' }}>가용소득</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {Math.round(salaryNum / 10000)}만 − {Math.round(fixedTotal / 10000)}만
+                </span>
                 <span className={disposable > 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
-                  {disposable.toLocaleString('ko-KR')}원
+                  가용 {Math.round(disposable / 10000)}만원
                 </span>
               </div>
             )}
@@ -336,7 +339,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
                 <span className={`text-xs font-medium w-14 shrink-0 ${isFixed ? 'text-white/30' : color.text}`}>{cat}</span>
                 {isFixed ? (
                   <div className="flex-1 flex items-center justify-between glass-sm rounded-lg px-3 py-1.5" style={{ opacity: 0.45 }}>
-                    <span className="text-xs text-white/60">{fixedAmt.toLocaleString('ko-KR')}</span>
+                    <span className="text-xs text-white/60">{fixedAmt}만원</span>
                     <span className="text-xs text-white/30">🔒 고정</span>
                   </div>
                 ) : (
@@ -348,7 +351,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
                     className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
                   />
                 )}
-                <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>원</span>
+                <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>만원</span>
               </div>
             )
           })}
