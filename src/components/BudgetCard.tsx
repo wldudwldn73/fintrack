@@ -15,9 +15,13 @@ interface Props {
 
 interface AiSuggestion {
   methodology: { name: string; principle: string; reason: string }
+  disposable: number
+  fixedTotal: number
   overall: string
   reasons: Record<string, string>
   budget: Record<string, number>
+  tips: string[]
+  scenarios: Array<{ name: string; description: string }>
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -26,9 +30,13 @@ const CATEGORY_EMOJI: Record<string, string> = {
   보험: '🛡', 적금: '🏦', 기부금: '🤝', 기타: '📦',
 }
 
+// 일반적으로 고정되는 카테고리
+const FIXED_CATEGORY_LIST = ['주거', '교통', '보험', '적금', '구독', '교육', '의료', '기부금']
+
 export default function BudgetCard({ transactions, budgets, year, month, onBudgetsChange }: Props) {
   const [editing, setEditing] = useState(false)
   const [editValues, setEditValues] = useState<Record<string, string>>({})
+  const [fixedValues, setFixedValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [salary, setSalary] = useState('')
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null)
@@ -53,6 +61,15 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
     setEditing(true)
   }
 
+  function getFixedExpenses(): Record<string, number> {
+    const result: Record<string, number> = {}
+    for (const [cat, val] of Object.entries(fixedValues)) {
+      const n = parseInt(val.replace(/,/g, ''), 10)
+      if (!isNaN(n) && n > 0) result[cat] = n
+    }
+    return result
+  }
+
   async function handleAiSuggest() {
     const salaryNum = parseInt(salary.replace(/,/g, ''), 10)
     if (isNaN(salaryNum) || salaryNum <= 0) return
@@ -62,15 +79,21 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
       const res = await fetch('/api/budget-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ salary: salaryNum }),
+        body: JSON.stringify({ salary: salaryNum, fixedExpenses: getFixedExpenses() }),
       })
       const data = await res.json() as AiSuggestion
       setAiSuggestion(data)
+
       const filled: Record<string, string> = {}
       for (const [cat, amount] of Object.entries(data.budget)) {
         if (EXPENSE_CATEGORIES.includes(cat as never) && amount > 0) {
           filled[cat] = amount.toString()
         }
+      }
+      // 고정 항목은 fixedValues 우선
+      for (const [cat, val] of Object.entries(fixedValues)) {
+        const n = parseInt(val.replace(/,/g, ''), 10)
+        if (!isNaN(n) && n > 0) filled[cat] = n.toString()
       }
       setEditValues(prev => ({ ...prev, ...filled }))
     } finally {
@@ -82,6 +105,8 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
     setSaving(true)
     try {
       const savedBudgets: Budget[] = []
+
+      // 변동 예산 저장
       for (const [category, val] of Object.entries(editValues)) {
         const amount = parseInt(val.replace(/,/g, ''), 10)
         if (isNaN(amount) || amount < 0) continue
@@ -94,10 +119,24 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
           savedBudgets.push({ id: existing?.id ?? '', year, month, category, amount })
         }
       }
-      const untouched = budgets.filter(b => !(b.category in editValues) && b.amount > 0)
-      onBudgetsChange([...savedBudgets, ...untouched])
+
+      // 고정 예산 저장 (editValues에 없는 것만)
+      for (const [category, val] of Object.entries(fixedValues)) {
+        if (category in editValues) continue
+        const amount = parseInt(val.replace(/,/g, ''), 10)
+        if (isNaN(amount) || amount <= 0) continue
+        await upsertBudget({ year, month, category, amount })
+        const existing = budgets.find(b => b.category === category)
+        savedBudgets.push({ id: existing?.id ?? '', year, month, category, amount })
+      }
+
+      const untouched = budgets.filter(b =>
+        !(b.category in editValues) && !(b.category in fixedValues) && b.amount > 0
+      )
+      onBudgetsChange([...savedBudgets, ...untouched].filter(b => b.amount > 0))
       setEditing(false)
       setEditValues({})
+      setFixedValues({})
       setAiSuggestion(null)
       setSalary('')
     } finally {
@@ -123,6 +162,10 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
   }
 
   if (editing) {
+    const fixedTotal = Object.values(getFixedExpenses()).reduce((s, v) => s + v, 0)
+    const salaryNum = parseInt(salary.replace(/,/g, ''), 10) || 0
+    const disposable = salaryNum > 0 ? salaryNum - fixedTotal : 0
+
     return (
       <div className="glass rounded-2xl p-5 glow-indigo space-y-4">
         {/* Header */}
@@ -131,31 +174,63 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
           <span className="text-xs ai-badge px-2 py-0.5 rounded-full text-indigo-300">{year}년 {month}월</span>
         </div>
 
-        {/* AI Suggest Input */}
-        <div className="rounded-xl p-3 space-y-2.5" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
+        {/* AI Suggest Section */}
+        <div className="rounded-xl p-3 space-y-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
           <div className="flex items-center gap-1.5">
             <span className="text-sm">✨</span>
             <p className="text-xs font-semibold text-indigo-300">AI 예산 추천</p>
           </div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>월급을 입력하면 AI가 카테고리별 예산을 자동으로 배분해드려요</p>
+
+          {/* 월급 입력 */}
           <div className="flex gap-2 items-center">
+            <span className="text-xs shrink-0 w-8" style={{ color: 'var(--text-muted)' }}>월급</span>
             <input
               type="number"
-              placeholder="월급 입력 (예: 3000000)"
+              placeholder="세후 월 소득"
               value={salary}
               onChange={e => setSalary(e.target.value)}
               className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
             />
             <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>원</span>
-            <button
-              onClick={handleAiSuggest}
-              disabled={aiLoading || !salary}
-              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition-all hover:scale-105"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
-            >
-              {aiLoading ? '분석 중…' : '추천 받기'}
-            </button>
           </div>
+
+          {/* 고정 지출 입력 */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 (바꿀 수 없는 항목만 입력)</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {FIXED_CATEGORY_LIST.map(cat => (
+                <div key={cat} className="flex items-center gap-1.5">
+                  <span className="text-xs w-4 text-center shrink-0">{CATEGORY_EMOJI[cat]}</span>
+                  <span className="text-xs w-9 shrink-0" style={{ color: 'var(--text-muted)' }}>{cat}</span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={fixedValues[cat] ?? ''}
+                    onChange={e => setFixedValues(v => ({ ...v, [cat]: e.target.value }))}
+                    className="flex-1 min-w-0 glass-sm rounded-md px-2 py-1 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-indigo-500/40"
+                  />
+                </div>
+              ))}
+            </div>
+            {/* 가용소득 계산 표시 */}
+            {salaryNum > 0 && fixedTotal > 0 && (
+              <div className="flex items-center justify-between text-xs pt-1 px-0.5">
+                <span style={{ color: 'var(--text-muted)' }}>가용소득</span>
+                <span className={disposable > 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
+                  {disposable.toLocaleString('ko-KR')}원
+                </span>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleAiSuggest}
+            disabled={aiLoading || !salary}
+            className="w-full py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition-all hover:scale-[1.01]"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+          >
+            {aiLoading ? '분석 중…' : 'AI 추천 받기'}
+          </button>
         </div>
 
         {/* AI Comment Block */}
@@ -172,24 +247,46 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{aiSuggestion.methodology.reason}</p>
               </div>
             )}
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">💡</span>
-              <p className="text-xs font-semibold text-cyan-300">AI 배분 전략</p>
+
+            {/* 가용소득 계산 요약 */}
+            {aiSuggestion.fixedTotal > 0 && (
+              <div className="flex items-center gap-2 text-xs px-0.5">
+                <span style={{ color: 'var(--text-muted)' }}>
+                  월급 {(aiSuggestion.fixedTotal + aiSuggestion.disposable).toLocaleString('ko-KR')}원
+                  <span className="mx-1">−</span>
+                  고정 {aiSuggestion.fixedTotal.toLocaleString('ko-KR')}원
+                </span>
+                <span className="text-emerald-400 font-semibold">= 가용 {aiSuggestion.disposable.toLocaleString('ko-KR')}원</span>
+              </div>
+            )}
+
+            {/* 배분 전략 */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="text-sm">💡</span>
+                <p className="text-xs font-semibold text-cyan-300">배분 전략</p>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{aiSuggestion.overall}</p>
             </div>
-            <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>{aiSuggestion.overall}</p>
-            <div className="space-y-2 pt-0.5">
+
+            {/* 카테고리별 이유 */}
+            <div className="space-y-2">
               {EXPENSE_CATEGORIES.map(cat => {
                 const reason = aiSuggestion.reasons?.[cat]
                 const amount = aiSuggestion.budget?.[cat]
                 if (!reason && !amount) return null
+                const isFixed = !!(fixedValues[cat] && parseInt(fixedValues[cat]) > 0)
                 return (
                   <div key={cat} className="flex gap-2.5 text-xs">
                     <span className="shrink-0 mt-0.5">{CATEGORY_EMOJI[cat]}</span>
-                    <div>
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-white/80 font-semibold">{cat}</span>
                         {amount != null && amount > 0 && (
                           <span className="text-indigo-300 font-medium">{amount.toLocaleString('ko-KR')}원</span>
+                        )}
+                        {isFixed && (
+                          <span className="text-xs text-amber-400/70 font-medium">🔒 고정</span>
                         )}
                       </div>
                       {reason && (
@@ -200,36 +297,69 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
                 )
               })}
             </div>
+
+            {/* 행동경제학 팁 */}
+            {aiSuggestion.tips && aiSuggestion.tips.length > 0 && (
+              <div className="pt-2 space-y-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-xs font-semibold text-emerald-300">⚡ 실행 팁</p>
+                {aiSuggestion.tips.map((tip, i) => (
+                  <p key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>• {tip}</p>
+                ))}
+              </div>
+            )}
+
+            {/* 시나리오 */}
+            {aiSuggestion.scenarios && aiSuggestion.scenarios.length > 0 && (
+              <div className="pt-2 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-xs font-semibold text-amber-300">🔀 시나리오 대안</p>
+                {aiSuggestion.scenarios.map((s, i) => (
+                  <div key={i} className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <p className="text-xs font-semibold text-white/70 mb-0.5">{s.name}</p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{s.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Category Inputs */}
+        {/* 카테고리 입력 */}
         <div className="space-y-2">
           {EXPENSE_CATEGORIES.map(cat => {
             const color = getCategoryColor(cat)
+            const isFixed = !!(fixedValues[cat] && parseInt(fixedValues[cat]) > 0)
+            const fixedAmt = isFixed ? parseInt(fixedValues[cat]) : 0
+
             return (
               <div key={cat} className="flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm ${color.bg} shrink-0`}>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0 ${isFixed ? 'opacity-40' : color.bg}`}>
                   {CATEGORY_EMOJI[cat] ?? '📦'}
                 </div>
-                <span className={`text-xs font-medium w-14 shrink-0 ${color.text}`}>{cat}</span>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={editValues[cat] ?? ''}
-                  onChange={e => setEditValues(v => ({ ...v, [cat]: e.target.value }))}
-                  className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
-                />
+                <span className={`text-xs font-medium w-14 shrink-0 ${isFixed ? 'text-white/30' : color.text}`}>{cat}</span>
+                {isFixed ? (
+                  <div className="flex-1 flex items-center justify-between glass-sm rounded-lg px-3 py-1.5" style={{ opacity: 0.45 }}>
+                    <span className="text-xs text-white/60">{fixedAmt.toLocaleString('ko-KR')}</span>
+                    <span className="text-xs text-white/30">🔒 고정</span>
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={editValues[cat] ?? ''}
+                    onChange={e => setEditValues(v => ({ ...v, [cat]: e.target.value }))}
+                    className="flex-1 glass-sm rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                  />
+                )}
                 <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>원</span>
               </div>
             )
           })}
         </div>
 
-        {/* Buttons */}
+        {/* 버튼 */}
         <div className="flex gap-2 pt-1">
           <button
-            onClick={() => { setEditing(false); setEditValues({}); setAiSuggestion(null); setSalary('') }}
+            onClick={() => { setEditing(false); setEditValues({}); setFixedValues({}); setAiSuggestion(null); setSalary('') }}
             className="flex-1 py-2.5 rounded-xl glass-sm text-white/50 text-sm hover:text-white/80 transition-colors"
           >
             취소
