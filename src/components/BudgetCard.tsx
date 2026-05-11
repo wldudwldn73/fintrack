@@ -180,6 +180,12 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
           <p className="text-sm font-semibold text-white">이번 달 예산 설정</p>
           <span className="text-xs ai-badge px-2 py-0.5 rounded-full text-indigo-300">{year}년 {month}월</span>
         </div>
+        <div className="rounded-lg px-3 py-2.5 flex items-center gap-2" style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.35)' }}>
+          <span className="text-sm shrink-0">💡</span>
+          <p className="text-xs text-amber-200">
+            모든 금액은 <span className="font-bold text-amber-300">만원 단위</span>예요 &nbsp;·&nbsp; 145,000원 → <span className="font-bold text-amber-300">14.5</span> 입력
+          </p>
+        </div>
 
         {/* AI Suggest Section */}
         <div className="rounded-xl p-3 space-y-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
@@ -203,7 +209,7 @@ export default function BudgetCard({ transactions, budgets, year, month, onBudge
 
           {/* 고정 지출 입력 */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 — 해당 항목만 입력 (만원, 소수점 가능: 14.5 = 145,000원)</p>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>🔒 고정 지출 — 바꿀 수 없는 항목만 입력하세요</p>
             <div className="grid grid-cols-2 gap-1.5">
               {EXPENSE_CATEGORIES.map(cat => (
                 <div key={cat} className="flex items-center gap-1.5">
