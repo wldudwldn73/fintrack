@@ -274,6 +274,8 @@ export default function CalendarTab({
     description: string
     memo: string
   } | null>(null)
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null)
+  const [inlineEditValue, setInlineEditValue] = useState('')
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [bulkExcludePrompt, setBulkExcludePrompt] = useState<{ keyword: string; count: number } | null>(null)
@@ -474,6 +476,15 @@ export default function CalendarTab({
     } finally {
       setSaving(false)
     }
+  }
+
+  async function saveInlineEdit(tx: Transaction) {
+    const newDesc = inlineEditValue.trim() || null
+    if (newDesc !== tx.description) {
+      await updateTransactionMeta(tx.id, { description: newDesc })
+      onMetaChange(tx.id, newDesc, tx.memo ?? null)
+    }
+    setInlineEditId(null)
   }
 
   async function handleDelete(id: string) {
@@ -778,8 +789,30 @@ export default function CalendarTab({
                           </span>
                         )}
                       </div>
-                      {tx.description && (
-                        <p className="text-sm font-medium mt-1 truncate text-white/80">{tx.description}</p>
+                      {inlineEditId === tx.id ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={inlineEditValue}
+                          onChange={e => setInlineEditValue(e.target.value)}
+                          onBlur={() => saveInlineEdit(tx)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveInlineEdit(tx) }
+                            if (e.key === 'Escape') setInlineEditId(null)
+                          }}
+                          className="mt-1 w-full glass-sm rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+                        />
+                      ) : (
+                        <p
+                          className="text-sm font-medium mt-1 truncate text-white/80 cursor-text select-text"
+                          onDoubleClick={() => {
+                            setInlineEditId(tx.id)
+                            setInlineEditValue(tx.description ?? '')
+                          }}
+                          title="더블클릭하여 수정"
+                        >
+                          {tx.description ?? <span className="text-white/25 text-xs">더블클릭하여 이름 입력</span>}
+                        </p>
                       )}
                       {tx.memo && (
                         <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
