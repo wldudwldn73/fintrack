@@ -15,6 +15,7 @@ export const CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: st
   보험:   { bg: 'bg-sky-500/15',     text: 'text-sky-400',      dot: '#0ea5e9' },
   적금:   { bg: 'bg-violet-500/15',  text: 'text-violet-400',   dot: '#8b5cf6' },
   기부금: { bg: 'bg-rose-500/15',    text: 'text-rose-400',     dot: '#f43f5e' },
+  카드대금: { bg: 'bg-slate-500/15',  text: 'text-slate-400',    dot: '#64748b' },
   기타:   { bg: 'bg-zinc-500/15',    text: 'text-zinc-400',     dot: '#9ca3af' },
 }
 
