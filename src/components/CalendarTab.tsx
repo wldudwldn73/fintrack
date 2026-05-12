@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Transaction } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import {
@@ -271,8 +271,12 @@ export default function CalendarTab({
   const [storyLoading, setStoryLoading] = useState(false)
   const [customCats, setCustomCats] = useState<CustomCat[]>([])
 
+  const bulkAnchorRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    if (bulkPrompt) window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (bulkPrompt) {
+      setTimeout(() => bulkAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 30)
+    }
   }, [bulkPrompt])
 
   useEffect(() => {
@@ -744,6 +748,7 @@ export default function CalendarTab({
       )}
 
       {/* 일괄 카테고리 변경 프롬프트 */}
+      <div ref={bulkAnchorRef} />
       {bulkPrompt && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-4" onClick={() => setBulkPrompt(null)}>
           <div className="glass rounded-2xl p-6 w-full sm:max-w-sm glow-indigo space-y-4" onClick={e => e.stopPropagation()}>
