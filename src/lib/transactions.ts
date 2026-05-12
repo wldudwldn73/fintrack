@@ -103,6 +103,12 @@ export async function updateTransactionType(id: string, type: string, category: 
   if (error) throw error
 }
 
+export async function updateTransactionSortOrders(updates: { id: string; sort_order: number }[]): Promise<void> {
+  await Promise.all(updates.map(({ id, sort_order }) =>
+    supabase.from('transactions').update({ sort_order }).eq('id', id)
+  ))
+}
+
 export async function updateTransactionMeta(
   id: string,
   updates: { description?: string | null; memo?: string | null },

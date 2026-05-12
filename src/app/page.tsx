@@ -129,6 +129,11 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, description, memo } : t))
   }
 
+  function handleSortOrderChange(updates: { id: string; sort_order: number }[]) {
+    const map = Object.fromEntries(updates.map(u => [u.id, u.sort_order]))
+    setTransactions(prev => prev.map(t => map[t.id] !== undefined ? { ...t, sort_order: map[t.id] } : t))
+  }
+
   async function handleIncomeConfirm(id: string, category: string) {
     await updateTransactionType(id, 'income', category)
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, type: 'income' as const, category } : t))
@@ -338,6 +343,7 @@ export default function Home() {
               onExcludedChange={handleExcludedChange}
               onBulkExcludedChange={handleBulkExcludedChange}
               onMetaChange={handleMetaChange}
+              onSortOrderChange={handleSortOrderChange}
             />
           </div>
         ) : tab === 'category' ? (

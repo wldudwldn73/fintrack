@@ -12,6 +12,7 @@ export interface Transaction {
   is_recurring: boolean
   is_excluded: boolean
   deleted: boolean
+  sort_order: number
   date: string
   created_at: string
 }

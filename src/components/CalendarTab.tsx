@@ -9,6 +9,7 @@ import {
   updateTransactionRecurring,
   updateTransactionExcluded,
   updateTransactionMeta,
+  updateTransactionSortOrders,
   excludeTransactionsByKeyword,
   deleteTransaction,
 } from '@/lib/transactions'
@@ -25,6 +26,7 @@ interface Props {
   onExcludedChange: (id: string, is_excluded: boolean) => void
   onBulkExcludedChange: (ids: string[]) => void
   onMetaChange: (id: string, description: string | null, memo: string | null) => void
+  onSortOrderChange: (updates: { id: string; sort_order: number }[]) => void
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -253,7 +255,7 @@ function fmt(n: number) {
 
 export default function CalendarTab({
   transactions, year, month,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onSortOrderChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -276,6 +278,7 @@ export default function CalendarTab({
   } | null>(null)
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineEditValue, setInlineEditValue] = useState('')
+  const [reorderMode, setReorderMode] = useState(false)
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [bulkExcludePrompt, setBulkExcludePrompt] = useState<{ keyword: string; count: number } | null>(null)
@@ -330,7 +333,14 @@ export default function CalendarTab({
   ]
   while (cells.length % 7 !== 0) cells.push(null)
 
-  const selectedTxs = transactions.filter(t => t.date === selectedDate)
+  const selectedTxs = useMemo(() => {
+    const txs = transactions.filter(t => t.date === selectedDate)
+    return [...txs].sort((a, b) => {
+      const ao = a.sort_order, bo = b.sort_order
+      if (ao !== bo) return ao - bo
+      return a.created_at.localeCompare(b.created_at)
+    })
+  }, [transactions, selectedDate])
   const selectedExpense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded).reduce((s, t) => s + t.amount, 0)
   const selectedIncome = selectedTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const dayInsights = useMemo(
@@ -478,6 +488,20 @@ export default function CalendarTab({
     }
   }
 
+  async function moveItem(index: number, dir: -1 | 1) {
+    const next = index + dir
+    if (next < 0 || next >= selectedTxs.length) return
+    // 현재 순서 배열을 복사 후 swap
+    const reordered = [...selectedTxs]
+    const tmp = reordered[index]
+    reordered[index] = reordered[next]
+    reordered[next] = tmp
+    // 전체 재할당 (10, 20, 30 ...) — 항상 깔끔한 상태 유지
+    const updates = reordered.map((t, i) => ({ id: t.id, sort_order: (i + 1) * 10 }))
+    onSortOrderChange(updates)
+    await updateTransactionSortOrders(updates)
+  }
+
   async function saveInlineEdit(tx: Transaction) {
     const newDesc = inlineEditValue.trim() || null
     if (newDesc !== tx.description) {
@@ -608,6 +632,18 @@ export default function CalendarTab({
           {selectedExpense > 0 && (
             <span className="text-xs text-rose-400 font-semibold">-{selectedExpense.toLocaleString('ko-KR')}원</span>
           )}
+          {selectedTxs.length > 1 && (
+            <button
+              onClick={() => setReorderMode(r => !r)}
+              className={`text-xs px-2 py-0.5 rounded-full transition-all ${
+                reorderMode
+                  ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-400/30'
+                  : 'glass-sm text-white/40 hover:text-white/70'
+              }`}
+            >
+              순서
+            </button>
+          )}
         </div>
       </div>
 
@@ -675,7 +711,7 @@ export default function CalendarTab({
         </div>
       ) : (
         <div className="glass rounded-2xl overflow-hidden divide-y divide-white/5">
-          {selectedTxs.map(tx => {
+          {selectedTxs.map((tx, txIndex) => {
             const isEditing = editingId === tx.id
             const cc = getCatColor(tx.category)
             const hasChanged = editState
@@ -687,7 +723,27 @@ export default function CalendarTab({
               : false
 
             return (
-              <div key={tx.id} className={`px-4 py-3 group transition-colors ${tx.is_excluded ? 'opacity-50' : ''}`}>
+              <div key={tx.id} className={`px-4 py-3 group transition-colors flex gap-2 ${tx.is_excluded ? 'opacity-50' : ''}`}>
+                {/* 순서 변경 버튼 */}
+                {reorderMode && !isEditing && (
+                  <div className="flex flex-col justify-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveItem(txIndex, -1)}
+                      disabled={txIndex === 0}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-white/40 hover:text-white/80 disabled:opacity-20 transition-colors text-xs glass-sm"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => moveItem(txIndex, 1)}
+                      disabled={txIndex === selectedTxs.length - 1}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-white/40 hover:text-white/80 disabled:opacity-20 transition-colors text-xs glass-sm"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
                 {isEditing && editState ? (
                   <div className="space-y-2.5">
                     {/* 내역 이름 편집 */}
@@ -837,6 +893,7 @@ export default function CalendarTab({
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             )
           })}
