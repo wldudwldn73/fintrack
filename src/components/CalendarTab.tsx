@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
+import { Transaction } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import {
   updateTransactionCategory,
@@ -10,6 +10,7 @@ import {
   updateTransactionExcluded,
   deleteTransaction,
 } from '@/lib/transactions'
+import CategoryPicker, { type CustomCat } from '@/components/CategoryPicker'
 
 interface Props {
   transactions: Transaction[]
@@ -268,12 +269,16 @@ export default function CalendarTab({
   const [saving, setSaving] = useState(false)
   const [storyCache, setStoryCache] = useState<Record<string, { situation?: string; pattern?: string; tip?: string } | null>>({})
   const [storyLoading, setStoryLoading] = useState(false)
-  const [customCats, setCustomCats] = useState<{ id: string; name: string; type: string }[]>([])
+  const [customCats, setCustomCats] = useState<CustomCat[]>([])
+
+  useEffect(() => {
+    if (bulkPrompt) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [bulkPrompt])
 
   useEffect(() => {
     fetch('/api/custom-categories')
       .then(r => r.json())
-      .then((data: { id: string; name: string; type: string }[]) => setCustomCats(Array.isArray(data) ? data : []))
+      .then((data: CustomCat[]) => setCustomCats(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
@@ -317,21 +322,28 @@ export default function CalendarTab({
     [selectedDate, transactions],
   )
 
+  function getCatColor(name: string) {
+    const custom = customCats.find(c => c.name === name)
+    return getCategoryColor(name, custom?.color)
+  }
+
   const donutSlices = useMemo(() => {
     const expense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded)
     if (expense.length === 0) return []
     const catMap: Record<string, number> = {}
     for (const t of expense) catMap[t.category] = (catMap[t.category] ?? 0) + t.amount
     const total = Object.values(catMap).reduce((s, v) => s + v, 0)
+    const customColorMap = Object.fromEntries(customCats.map(c => [c.name, c.color]))
     return Object.entries(catMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([category, amount]) => ({
         category, amount,
-        color: getCategoryColor(category).dot,
+        color: getCategoryColor(category, customColorMap[category]).dot,
         pct: amount / total,
       }))
-  }, [selectedTxs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTxs, customCats])
 
   async function fetchStory(date: string, txs: Transaction[]) {
     const expense = txs.filter(t => t.type === 'expense' && !t.is_excluded)
@@ -612,10 +624,7 @@ export default function CalendarTab({
         <div className="glass rounded-2xl overflow-hidden divide-y divide-white/5">
           {selectedTxs.map(tx => {
             const isEditing = editingId === tx.id
-            const cc = getCategoryColor(tx.category)
-            const defaultCats = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
-            const userCatNames = customCats.filter(c => c.type === tx.type).map(c => c.name)
-            const cats = [...defaultCats, ...userCatNames] as string[]
+            const cc = getCatColor(tx.category)
             const hasChanged = editState
               ? editState.category !== tx.category || editState.is_recurring !== tx.is_recurring || editState.is_excluded !== tx.is_excluded
               : false
@@ -624,24 +633,13 @@ export default function CalendarTab({
               <div key={tx.id} className={`px-4 py-3 group transition-colors ${tx.is_excluded ? 'opacity-50' : ''}`}>
                 {isEditing && editState ? (
                   <div className="space-y-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      {cats.map(c => {
-                        const ccc = getCategoryColor(c)
-                        return (
-                          <button
-                            key={c}
-                            onClick={() => setEditState(s => s ? { ...s, category: c } : s)}
-                            className={`text-xs px-2 py-0.5 rounded-full transition-all ${
-                              editState.category === c
-                                ? `${ccc.bg} ${ccc.text} ring-1 ring-white/15 font-semibold`
-                                : 'glass-sm text-white/45 hover:text-white/80'
-                            }`}
-                          >
-                            {c}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <CategoryPicker
+                      type={tx.type}
+                      selected={editState.category}
+                      onChange={c => setEditState(s => s ? { ...s, category: c } : s)}
+                      externalCats={customCats}
+                      onCatsChange={setCustomCats}
+                    />
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => setEditState(s => s ? { ...s, is_recurring: !s.is_recurring } : s)}
