@@ -20,6 +20,8 @@ import { getTransactions, addTransaction, addTransactions, deleteTransaction, up
 import IncomeCandidateBanner, { INCOME_KEYWORDS, loadDismissed, saveDismissed } from '@/components/IncomeCandidateBanner'
 import { getBudgets } from '@/lib/budget'
 import { generateInsights } from '@/lib/insights'
+import SupportItemBanner from '@/components/SupportItemBanner'
+import { SUPPORT_KEYWORDS, loadDismissedSupport, saveDismissedSupport, getSupportItems, addSupportItem, type SupportItem } from '@/lib/supportItems'
 
 export default function Home() {
   const now = new Date()
@@ -37,8 +39,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
   const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(new Set())
+  const [dismissedSupport, setDismissedSupport] = useState<Set<string>>(new Set())
+  const [supportItems, setSupportItems] = useState<SupportItem[]>([])
 
   useEffect(() => { setDismissedIncome(loadDismissed()) }, [])
+  useEffect(() => { setDismissedSupport(loadDismissedSupport()) }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
@@ -58,14 +63,16 @@ export default function Home() {
     try {
       const prevY = month === 1 ? year - 1 : year
       const prevM = month === 1 ? 12 : month - 1
-      const [data, prevData, budgetData] = await Promise.all([
+      const [data, prevData, budgetData, supportData] = await Promise.all([
         getTransactions(year, month),
         getTransactions(prevY, prevM),
         getBudgets(year, month),
+        getSupportItems(year, month),
       ])
       setTransactions(data)
       setPrevTransactions(prevData)
       setBudgets(budgetData)
+      setSupportItems(supportData)
     } finally {
       setLoading(false)
     }
@@ -118,6 +125,10 @@ export default function Home() {
     setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, is_excluded: true } : t))
   }
 
+  function handleMetaChange(id: string, description: string | null, memo: string | null) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, description, memo } : t))
+  }
+
   async function handleIncomeConfirm(id: string, category: string) {
     await updateTransactionType(id, 'income', category)
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, type: 'income' as const, category } : t))
@@ -128,6 +139,32 @@ export default function Home() {
     next.add(description)
     setDismissedIncome(next)
     saveDismissed(next)
+  }
+
+  async function handleSupportConfirm(tx: Transaction) {
+    await addSupportItem({
+      transaction_id: tx.id,
+      source_name: tx.description ?? undefined,
+      amount: tx.amount,
+      category: '지원',
+      date: tx.date,
+    })
+    setSupportItems(prev => [...prev, {
+      id: crypto.randomUUID(),
+      transaction_id: tx.id,
+      source_name: tx.description,
+      amount: tx.amount,
+      category: '지원',
+      date: tx.date,
+      created_at: new Date().toISOString(),
+    }])
+  }
+
+  function handleSupportDismiss(description: string) {
+    const next = new Set(dismissedSupport)
+    next.add(description)
+    setDismissedSupport(next)
+    saveDismissedSupport(next)
   }
 
   // 지출 제외된 항목은 분석에서 제외
@@ -145,6 +182,22 @@ export default function Home() {
       !dismissedIncome.has(t.description!)
     )
   }, [transactions, loading, dismissedIncome])
+
+  // 지원 후보: income이지만 지원 키워드가 포함된 항목 (이미 지원 항목 등록된 것 + dismissedSupport 제외)
+  const registeredSupportTxIds = new Set(supportItems.map(s => s.transaction_id).filter(Boolean))
+  const supportCandidates = useMemo(() => {
+    if (loading) return []
+    return transactions.filter(t =>
+      t.type === 'income' &&
+      t.description &&
+      SUPPORT_KEYWORDS.some(kw => t.description!.includes(kw)) &&
+      !registeredSupportTxIds.has(t.id) &&
+      !dismissedSupport.has(t.description!)
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, loading, dismissedSupport, supportItems])
+
+  const supportTotal = supportItems.reduce((s, i) => s + i.amount, 0)
 
   const TABS = [
     { key: 'list' as const, label: '달력' },
@@ -216,6 +269,7 @@ export default function Home() {
             month={month}
             onPrev={prevMonth}
             onNext={nextMonth}
+            supportTotal={supportTotal}
           />
         </div>
 
@@ -233,6 +287,17 @@ export default function Home() {
               candidates={incomeCandidates}
               onConfirm={handleIncomeConfirm}
               onDismiss={handleIncomeDismiss}
+            />
+          </div>
+        )}
+
+        {/* 지원 항목 후보 확인 */}
+        {!loading && supportCandidates.length > 0 && (
+          <div className="anim-up-2">
+            <SupportItemBanner
+              candidates={supportCandidates}
+              onConfirm={handleSupportConfirm}
+              onDismiss={handleSupportDismiss}
             />
           </div>
         )}
@@ -272,6 +337,7 @@ export default function Home() {
               onRecurringChange={handleRecurringChange}
               onExcludedChange={handleExcludedChange}
               onBulkExcludedChange={handleBulkExcludedChange}
+              onMetaChange={handleMetaChange}
             />
           </div>
         ) : tab === 'category' ? (

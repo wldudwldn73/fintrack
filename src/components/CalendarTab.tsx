@@ -8,6 +8,7 @@ import {
   updateTransactionCategoryByKeyword,
   updateTransactionRecurring,
   updateTransactionExcluded,
+  updateTransactionMeta,
   excludeTransactionsByKeyword,
   deleteTransaction,
 } from '@/lib/transactions'
@@ -23,6 +24,7 @@ interface Props {
   onRecurringChange: (id: string, is_recurring: boolean) => void
   onExcludedChange: (id: string, is_excluded: boolean) => void
   onBulkExcludedChange: (ids: string[]) => void
+  onMetaChange: (id: string, description: string | null, memo: string | null) => void
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -251,7 +253,7 @@ function fmt(n: number) {
 
 export default function CalendarTab({
   transactions, year, month,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -265,7 +267,13 @@ export default function CalendarTab({
 
   const [selectedDate, setSelectedDate] = useState(defaultSelected)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editState, setEditState] = useState<{ category: string; is_recurring: boolean; is_excluded: boolean } | null>(null)
+  const [editState, setEditState] = useState<{
+    category: string
+    is_recurring: boolean
+    is_excluded: boolean
+    description: string
+    memo: string
+  } | null>(null)
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [bulkExcludePrompt, setBulkExcludePrompt] = useState<{ keyword: string; count: number } | null>(null)
@@ -402,7 +410,13 @@ export default function CalendarTab({
 
   function startEdit(tx: Transaction) {
     setEditingId(tx.id)
-    setEditState({ category: tx.category, is_recurring: tx.is_recurring, is_excluded: tx.is_excluded })
+    setEditState({
+      category: tx.category,
+      is_recurring: tx.is_recurring,
+      is_excluded: tx.is_excluded,
+      description: tx.description ?? '',
+      memo: tx.memo ?? '',
+    })
   }
 
   function cancelEdit() {
@@ -433,6 +447,12 @@ export default function CalendarTab({
       if (editState.is_excluded !== tx.is_excluded) {
         promises.push(updateTransactionExcluded(tx.id, editState.is_excluded))
         onExcludedChange(tx.id, editState.is_excluded)
+      }
+      const newDesc = editState.description.trim() || null
+      const newMemo = editState.memo.trim() || null
+      if (newDesc !== tx.description || newMemo !== (tx.memo ?? null)) {
+        promises.push(updateTransactionMeta(tx.id, { description: newDesc, memo: newMemo }))
+        onMetaChange(tx.id, newDesc, newMemo)
       }
       await Promise.all(promises)
 
@@ -648,13 +668,33 @@ export default function CalendarTab({
             const isEditing = editingId === tx.id
             const cc = getCatColor(tx.category)
             const hasChanged = editState
-              ? editState.category !== tx.category || editState.is_recurring !== tx.is_recurring || editState.is_excluded !== tx.is_excluded
+              ? editState.category !== tx.category
+                || editState.is_recurring !== tx.is_recurring
+                || editState.is_excluded !== tx.is_excluded
+                || editState.description !== (tx.description ?? '')
+                || editState.memo !== (tx.memo ?? '')
               : false
 
             return (
               <div key={tx.id} className={`px-4 py-3 group transition-colors ${tx.is_excluded ? 'opacity-50' : ''}`}>
                 {isEditing && editState ? (
                   <div className="space-y-2.5">
+                    {/* 내역 이름 편집 */}
+                    <input
+                      type="text"
+                      value={editState.description}
+                      onChange={e => setEditState(s => s ? { ...s, description: e.target.value } : s)}
+                      placeholder="내역 이름"
+                      className="w-full glass-sm rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                    />
+                    {/* 메모 */}
+                    <input
+                      type="text"
+                      value={editState.memo}
+                      onChange={e => setEditState(s => s ? { ...s, memo: e.target.value } : s)}
+                      placeholder="메모 (선택)"
+                      className="w-full glass-sm rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                    />
                     <CategoryPicker
                       type={tx.type}
                       selected={editState.category}
@@ -740,6 +780,11 @@ export default function CalendarTab({
                       </div>
                       {tx.description && (
                         <p className="text-sm font-medium mt-1 truncate text-white/80">{tx.description}</p>
+                      )}
+                      {tx.memo && (
+                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                          📝 {tx.memo}
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 ml-3 shrink-0">

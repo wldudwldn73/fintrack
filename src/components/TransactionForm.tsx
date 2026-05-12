@@ -17,6 +17,7 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
+  const [memo, setMemo] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(false)
 
@@ -31,7 +32,7 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
     if (!amount || !category) return
     setLoading(true)
     try {
-      await onSubmit({ type, amount: Number(amount), category, description: description || undefined, date })
+      await onSubmit({ type, amount: Number(amount), category, description: description || undefined, memo: memo || undefined, date })
       onClose()
     } finally {
       setLoading(false)
@@ -86,9 +87,18 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
           {/* Description */}
           <input
             type="text"
-            placeholder="메모 (선택)"
+            placeholder="이름 (선택)"
             value={description}
             onChange={e => setDescription(e.target.value)}
+            className={INPUT_CLASS}
+          />
+
+          {/* Memo */}
+          <input
+            type="text"
+            placeholder="메모 (선택)"
+            value={memo}
+            onChange={e => setMemo(e.target.value)}
             className={INPUT_CLASS}
           />
 

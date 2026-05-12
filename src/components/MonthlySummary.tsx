@@ -8,9 +8,10 @@ interface Props {
   month: number
   onPrev: () => void
   onNext: () => void
+  supportTotal?: number
 }
 
-export default function MonthlySummary({ transactions, year, month, onPrev, onNext }: Props) {
+export default function MonthlySummary({ transactions, year, month, onPrev, onNext, supportTotal }: Props) {
   const income  = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const balance = income - expense
@@ -77,6 +78,17 @@ export default function MonthlySummary({ transactions, year, month, onPrev, onNe
           <p className="text-sm font-bold text-rose-300 text-glow-rose">{fmt(expense)}원</p>
         </div>
       </div>
+
+      {/* Support total */}
+      {supportTotal !== undefined && supportTotal > 0 && (
+        <div className="mt-3 relative flex items-center justify-center gap-1.5 py-2 rounded-xl"
+          style={{ background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.2)' }}
+        >
+          <span className="text-xs">🤝</span>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>이번 달 지원금</p>
+          <p className="text-xs font-bold text-yellow-300">{fmt(supportTotal)}원</p>
+        </div>
+      )}
     </div>
   )
 }

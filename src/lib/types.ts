@@ -6,6 +6,7 @@ export interface Transaction {
   amount: number
   category: string
   description: string | null
+  memo: string | null
   payment_method: string | null
   institution: string | null
   is_recurring: boolean
@@ -20,6 +21,7 @@ export interface TransactionInsert {
   amount: number
   category: string
   description?: string
+  memo?: string
   payment_method?: string
   institution?: string
   is_recurring?: boolean

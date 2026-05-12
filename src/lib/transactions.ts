@@ -103,6 +103,14 @@ export async function updateTransactionType(id: string, type: string, category: 
   if (error) throw error
 }
 
+export async function updateTransactionMeta(
+  id: string,
+  updates: { description?: string | null; memo?: string | null },
+): Promise<void> {
+  const { error } = await supabase.from('transactions').update(updates).eq('id', id)
+  if (error) throw error
+}
+
 /** Soft delete — sets deleted=true so the row stays in the DB */
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').update({ deleted: true }).eq('id', id)
