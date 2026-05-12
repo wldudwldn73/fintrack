@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { TransactionInsert, TransactionType, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getRuleBasedCategory } from '@/lib/categoryRules'
 import { getCategoryColor } from '@/lib/categoryColors'
+
+interface CustomCat { id: string; name: string; type: string }
 
 interface Props {
   onSubmit: (tx: TransactionInsert) => Promise<void>
@@ -20,13 +22,67 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(false)
 
-  const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
+  const [customCats, setCustomCats] = useState<CustomCat[]>([])
+  const [showAddInput, setShowAddInput] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [addingCat, setAddingCat] = useState(false)
+  const newCatInputRef = useRef<HTMLInputElement>(null)
+
+  const defaultCategories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
+  const userCats = customCats.filter(c => c.type === type)
+
+  useEffect(() => {
+    fetch('/api/custom-categories')
+      .then(r => r.json())
+      .then((data: CustomCat[]) => setCustomCats(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (showAddInput) setTimeout(() => newCatInputRef.current?.focus(), 50)
+  }, [showAddInput])
 
   useEffect(() => {
     if (!description || category) return
     const suggested = getRuleBasedCategory(description, type)
     if (suggested) setCategory(suggested)
   }, [description, type])
+
+  async function handleAddCat() {
+    const name = newCatName.trim()
+    if (!name) return
+    const isDuplicate = [...defaultCategories as readonly string[], ...userCats.map(c => c.name)]
+      .some(c => c === name)
+    if (isDuplicate) {
+      setNewCatName('')
+      setShowAddInput(false)
+      setCategory(name)
+      return
+    }
+    setAddingCat(true)
+    try {
+      const res = await fetch('/api/custom-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type }),
+      })
+      const data = await res.json() as CustomCat
+      if (data.id) {
+        setCustomCats(prev => [...prev, data])
+        setCategory(data.name)
+      }
+    } finally {
+      setAddingCat(false)
+      setNewCatName('')
+      setShowAddInput(false)
+    }
+  }
+
+  async function handleDeleteCat(id: string, name: string) {
+    setCustomCats(prev => prev.filter(c => c.id !== id))
+    if (category === name) setCategory('')
+    fetch(`/api/custom-categories?id=${id}`, { method: 'DELETE' })
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -58,7 +114,7 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
               <button
                 key={t}
                 type="button"
-                onClick={() => { setType(t); setCategory('') }}
+                onClick={() => { setType(t); setCategory(''); setShowAddInput(false) }}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   type === t
                     ? t === 'expense'
@@ -84,7 +140,8 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
 
           {/* Category chips */}
           <div className="flex flex-wrap gap-1.5">
-            {categories.map(c => {
+            {/* 기본 카테고리 */}
+            {defaultCategories.map(c => {
               const cc = getCategoryColor(c)
               return (
                 <button
@@ -101,6 +158,79 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
                 </button>
               )
             })}
+
+            {/* 사용자 커스텀 카테고리 */}
+            {userCats.map(c => {
+              const cc = getCategoryColor(c.name)
+              return (
+                <span
+                  key={c.id}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    category === c.name
+                      ? `${cc.bg} ${cc.text} ring-1 ring-white/15 scale-105`
+                      : 'glass-sm text-white/45'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setCategory(c.name)}
+                    className="hover:text-white/80 transition-colors"
+                  >
+                    {c.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCat(c.id, c.name)}
+                    className="text-white/30 hover:text-rose-400 transition-colors leading-none ml-0.5"
+                    title="삭제"
+                  >
+                    ×
+                  </button>
+                </span>
+              )
+            })}
+
+            {/* + 추가 버튼 / 인풋 */}
+            {showAddInput ? (
+              <span className="inline-flex items-center gap-1 glass-sm rounded-full px-2 py-1">
+                <input
+                  ref={newCatInputRef}
+                  type="text"
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddCat() }
+                    if (e.key === 'Escape') { setShowAddInput(false); setNewCatName('') }
+                  }}
+                  placeholder="카테고리명"
+                  className="bg-transparent text-xs text-white placeholder-white/30 outline-none w-20"
+                  maxLength={10}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCat}
+                  disabled={addingCat || !newCatName.trim()}
+                  className="text-xs text-indigo-400 font-semibold disabled:opacity-40 hover:text-indigo-300 transition-colors"
+                >
+                  {addingCat ? '…' : '확인'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddInput(false); setNewCatName('') }}
+                  className="text-white/30 hover:text-white/60 transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddInput(true)}
+                className="px-3 py-1.5 rounded-full text-xs glass-sm text-white/35 hover:text-white/60 transition-all border border-white/10 border-dashed"
+              >
+                + 추가
+              </button>
+            )}
           </div>
 
           {/* Description */}

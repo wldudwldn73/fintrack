@@ -268,6 +268,14 @@ export default function CalendarTab({
   const [saving, setSaving] = useState(false)
   const [storyCache, setStoryCache] = useState<Record<string, { situation?: string; pattern?: string; tip?: string } | null>>({})
   const [storyLoading, setStoryLoading] = useState(false)
+  const [customCats, setCustomCats] = useState<{ id: string; name: string; type: string }[]>([])
+
+  useEffect(() => {
+    fetch('/api/custom-categories')
+      .then(r => r.json())
+      .then((data: { id: string; name: string; type: string }[]) => setCustomCats(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
 
   // 첫 진입 시 기본 선택 날짜 스토리 로드
   useEffect(() => {
@@ -605,7 +613,9 @@ export default function CalendarTab({
           {selectedTxs.map(tx => {
             const isEditing = editingId === tx.id
             const cc = getCategoryColor(tx.category)
-            const cats = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+            const defaultCats = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+            const userCatNames = customCats.filter(c => c.type === tx.type).map(c => c.name)
+            const cats = [...defaultCats, ...userCatNames] as string[]
             const hasChanged = editState
               ? editState.category !== tx.category || editState.is_recurring !== tx.is_recurring || editState.is_excluded !== tx.is_excluded
               : false
