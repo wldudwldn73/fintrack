@@ -12,6 +12,7 @@ import CategoryBreakdown from '@/components/CategoryBreakdown'
 import Dashboard from '@/components/Dashboard'
 import InsightCards from '@/components/InsightCards'
 import BudgetCard from '@/components/BudgetCard'
+import CalendarTab from '@/components/CalendarTab'
 import LearnedCategoriesModal from '@/components/LearnedCategoriesModal'
 import { Transaction, TransactionInsert, Budget } from '@/lib/types'
 import { getTransactions, addTransaction, addTransactions, deleteTransaction } from '@/lib/transactions'
@@ -112,7 +113,7 @@ export default function Home() {
   const insights = generateInsights(activeTransactions, prevTransactions.filter(t => !t.is_excluded))
 
   const TABS = [
-    { key: 'list' as const, label: '날짜별' },
+    { key: 'list' as const, label: '달력' },
     { key: 'category' as const, label: '카테고리' },
     { key: 'dashboard' as const, label: '대시보드' },
   ]
@@ -208,7 +209,7 @@ export default function Home() {
           </div>
         ) : tab === 'list' ? (
           <div className="anim-up-4">
-            <TransactionList
+            <CalendarTab
               transactions={transactions}
               year={year}
               month={month}
