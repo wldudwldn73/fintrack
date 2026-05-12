@@ -77,6 +77,14 @@ export default function TransactionList({
       if (editState.category !== tx.category) {
         promises.push(updateTransactionCategory(tx.id, editState.category))
         onCategoryChange(tx.id, editState.category)
+        // AI가 다음번에 기억하도록 학습
+        if (tx.description?.trim()) {
+          fetch('/api/learn-category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ merchant: tx.description.trim(), category: editState.category }),
+          })
+        }
       }
       if (editState.is_recurring !== tx.is_recurring) {
         promises.push(updateTransactionRecurring(tx.id, editState.is_recurring))
@@ -113,6 +121,12 @@ export default function TransactionList({
       bulkPrompt.keyword, bulkPrompt.category, scope, year, month,
     )
     onBulkCategoryChange(updatedIds, bulkPrompt.category)
+    // AI가 다음번에 기억하도록 학습
+    fetch('/api/learn-category', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant: bulkPrompt.keyword, category: bulkPrompt.category }),
+    })
     setBulkPrompt(null)
   }
 
