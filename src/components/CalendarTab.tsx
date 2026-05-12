@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import {
@@ -210,6 +210,17 @@ export default function CalendarTab({
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [storyCache, setStoryCache] = useState<Record<string, string | null>>({})
+  const [storyLoading, setStoryLoading] = useState(false)
+
+  // 첫 진입 시 기본 선택 날짜 스토리 로드
+  useEffect(() => {
+    const dayTxs = transactions.filter(t => t.date === selectedDate)
+    if (dayTxs.some(t => t.type === 'expense' && !t.is_excluded)) {
+      fetchStory(selectedDate, dayTxs)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 날짜별 지출 합계 맵
   const dailyMap = useMemo(() => {
@@ -241,6 +252,50 @@ export default function CalendarTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedDate, transactions],
   )
+
+  async function fetchStory(date: string, txs: Transaction[]) {
+    const expense = txs.filter(t => t.type === 'expense' && !t.is_excluded)
+    const dayTotal = expense.reduce((s, t) => s + t.amount, 0)
+    if (dayTotal === 0) return
+
+    // 카테고리별 집계
+    const catMap: Record<string, { amount: number; count: number }> = {}
+    for (const t of expense) {
+      if (!catMap[t.category]) catMap[t.category] = { amount: 0, count: 0 }
+      catMap[t.category].amount += t.amount
+      catMap[t.category].count += 1
+    }
+    const categories = Object.entries(catMap)
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .map(([category, { amount, count }]) => ({ category, amount, count }))
+
+    // 일평균, 요일 평균 계산
+    const allExpenses = transactions.filter(t => t.type === 'expense' && !t.is_excluded)
+    const expenseByDate: Record<string, number> = {}
+    for (const t of allExpenses) expenseByDate[t.date] = (expenseByDate[t.date] ?? 0) + t.amount
+    const otherDates = Object.entries(expenseByDate).filter(([d]) => d !== date)
+    const avgDaily = otherDates.length > 0
+      ? otherDates.reduce((s, [, v]) => s + v, 0) / otherDates.length
+      : null
+    const dow = new Date(date + 'T00:00:00').getDay()
+    const sameDow = otherDates.filter(([d]) => new Date(d + 'T00:00:00').getDay() === dow)
+    const avgDow = sameDow.length >= 2
+      ? sameDow.reduce((s, [, v]) => s + v, 0) / sameDow.length
+      : null
+
+    setStoryLoading(true)
+    try {
+      const res = await fetch('/api/day-comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, categories, dayTotal, avgDaily, dow, avgDow }),
+      })
+      const { story } = await res.json() as { story: string | null }
+      setStoryCache(prev => ({ ...prev, [date]: story }))
+    } finally {
+      setStoryLoading(false)
+    }
+  }
 
   function dateStr(d: number) {
     return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -347,7 +402,16 @@ export default function CalendarTab({
             return (
               <button
                 key={idx}
-                onClick={() => { setSelectedDate(ds); setEditingId(null); setEditState(null) }}
+                onClick={() => {
+                  setSelectedDate(ds)
+                  setEditingId(null)
+                  setEditState(null)
+                  // 캐시에 없을 때만 AI 호출
+                  if (!(ds in storyCache)) {
+                    const dayTxs = transactions.filter(t => t.date === ds)
+                    fetchStory(ds, dayTxs)
+                  }
+                }}
                 className={`relative flex flex-col items-center py-1.5 rounded-xl transition-all active:scale-95 ${
                   isSelected
                     ? 'bg-indigo-500/25 ring-1 ring-indigo-400/50'
@@ -402,7 +466,25 @@ export default function CalendarTab({
         </div>
       </div>
 
-      {/* AI 코멘트 카드 */}
+      {/* AI 스토리텔링 카드 */}
+      {storyLoading ? (
+        <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          <span className="text-base shrink-0">✨</span>
+          <div className="flex-1 space-y-1.5">
+            <div className="h-2.5 rounded-full w-4/5 shimmer" />
+            <div className="h-2.5 rounded-full w-3/5 shimmer" />
+          </div>
+        </div>
+      ) : storyCache[selectedDate] ? (
+        <div className="rounded-2xl px-4 py-3 flex items-start gap-3"
+          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
+          <span className="text-base shrink-0 mt-0.5">✨</span>
+          <p className="text-xs text-indigo-200 leading-relaxed">{storyCache[selectedDate]}</p>
+        </div>
+      ) : null}
+
+      {/* 패턴 분석 코멘트 */}
       {dayInsights.map((insight, i) => {
         const s = COMMENT_STYLE[insight.type]
         return (
