@@ -210,7 +210,7 @@ export default function CalendarTab({
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [storyCache, setStoryCache] = useState<Record<string, string | null>>({})
+  const [storyCache, setStoryCache] = useState<Record<string, { situation?: string; pattern?: string; tip?: string } | null>>({})
   const [storyLoading, setStoryLoading] = useState(false)
 
   // 첫 진입 시 기본 선택 날짜 스토리 로드
@@ -290,7 +290,7 @@ export default function CalendarTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, categories, dayTotal, avgDaily, dow, avgDow }),
       })
-      const { story } = await res.json() as { story: string | null }
+      const { story } = await res.json() as { story: { situation?: string; pattern?: string; tip?: string } | null }
       setStoryCache(prev => ({ ...prev, [date]: story }))
     } finally {
       setStoryLoading(false)
@@ -468,21 +468,37 @@ export default function CalendarTab({
 
       {/* AI 스토리텔링 카드 */}
       {storyLoading ? (
-        <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+        <div className="rounded-2xl overflow-hidden"
           style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
-          <span className="text-base shrink-0">✨</span>
-          <div className="flex-1 space-y-1.5">
-            <div className="h-2.5 rounded-full w-4/5 shimmer" />
-            <div className="h-2.5 rounded-full w-3/5 shimmer" />
+          {[0.8, 0.6, 0.7].map((w, i) => (
+            <div key={i} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-white/5' : ''}`}>
+              <div className="w-4 h-4 rounded-full shimmer shrink-0" />
+              <div className="h-2.5 rounded-full shimmer" style={{ width: `${w * 100}%` }} />
+            </div>
+          ))}
+        </div>
+      ) : storyCache[selectedDate] ? (() => {
+        const s = storyCache[selectedDate]!
+        const rows = [
+          { key: 'situation', emoji: '🌤', text: s.situation },
+          { key: 'pattern',   emoji: '🔎', text: s.pattern },
+          { key: 'tip',       emoji: '💡', text: s.tip },
+        ].filter(r => r.text)
+        if (!rows.length) return null
+        return (
+          <div className="rounded-2xl overflow-hidden"
+            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
+            {rows.map((row, i) => (
+              <div key={row.key}
+                className={`flex items-start gap-3 px-4 py-3 ${i > 0 ? 'border-t border-white/6' : ''}`}
+              >
+                <span className="text-sm shrink-0 mt-0.5">{row.emoji}</span>
+                <p className="text-xs text-indigo-200 leading-relaxed">{row.text}</p>
+              </div>
+            ))}
           </div>
-        </div>
-      ) : storyCache[selectedDate] ? (
-        <div className="rounded-2xl px-4 py-3 flex items-start gap-3"
-          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
-          <span className="text-base shrink-0 mt-0.5">✨</span>
-          <p className="text-xs text-indigo-200 leading-relaxed">{storyCache[selectedDate]}</p>
-        </div>
-      ) : null}
+        )
+      })() : null}
 
       {/* 패턴 분석 코멘트 */}
       {dayInsights.map((insight, i) => {
