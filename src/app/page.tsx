@@ -14,6 +14,7 @@ import InsightCards from '@/components/InsightCards'
 import BudgetCard from '@/components/BudgetCard'
 import CalendarTab from '@/components/CalendarTab'
 import LearnedCategoriesModal from '@/components/LearnedCategoriesModal'
+import CoachModal from '@/components/CoachModal'
 import { Transaction, TransactionInsert, Budget } from '@/lib/types'
 import { getTransactions, addTransaction, addTransactions, deleteTransaction } from '@/lib/transactions'
 import { getBudgets } from '@/lib/budget'
@@ -31,6 +32,7 @@ export default function Home() {
   const [showImport, setShowImport] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [showLearnedCategories, setShowLearnedCategories] = useState(false)
+  const [showCoach, setShowCoach] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
 
@@ -134,6 +136,14 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCoach(true)}
+              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
+              style={{ color: 'var(--text-secondary)' }}
+              title="AI 소비 코치"
+            >
+              😤
+            </button>
             <button
               onClick={() => setShowLearnedCategories(true)}
               className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
@@ -257,6 +267,14 @@ export default function Home() {
       {showChat && <ChatModal year={year} month={month} onClose={() => setShowChat(false)} onDataChange={load} />}
       {showImport && <CsvImport onImport={handleImport} onClose={() => setShowImport(false)} />}
       {showLearnedCategories && <LearnedCategoriesModal onClose={() => setShowLearnedCategories(false)} />}
+      {showCoach && (
+        <CoachModal
+          transactions={transactions}
+          year={year}
+          month={month}
+          onClose={() => setShowCoach(false)}
+        />
+      )}
     </div>
   )
 }
