@@ -107,19 +107,18 @@ function getDayInsights(
 
   // 1. 일평균 대비 고지출 분석
   if (avgDaily > 0 && ratio >= 2) {
-    const topCatsStr = sorted.slice(0, 2).map(([c, v]) => `${c} ${Math.round(v / 1000)}천원`).join(', ')
+    const topCatsStr = sorted.slice(0, 2).map(([c, v]) => `${c} ${w(v)}`).join(', ')
     comments.push({
       emoji: '⚠️',
-      text: `이번 달 일평균(${Math.round(avgDaily / 1000)}천원)보다 ${ratio.toFixed(1)}배 더 쓴 날이에요. 주요 지출은 ${topCatsStr}이에요. 충동 지출이 있었다면 다음 날 하루 무지출 챌린지로 균형을 맞춰보세요.`,
+      text: `이번 달 일평균(${w(avgDaily)})보다 ${ratio.toFixed(1)}배 더 쓴 날이에요. 주요 지출은 ${topCatsStr}이에요. 충동 지출이 있었다면 다음 날 하루 무지출 챌린지로 균형을 맞춰보세요.`,
       type: 'warning',
     })
   } else if (avgDaily > 0 && ratio <= 0.5) {
-    // 절약 칭찬
-    const saved = Math.round((avgDaily - dayTotal) / 1000)
-    const monthSaved = saved * 20 // 한 달 20일 적용 시
+    const saved = avgDaily - dayTotal
+    const monthSaved = saved * 20
     comments.push({
       emoji: '🌟',
-      text: `평소(${Math.round(avgDaily / 1000)}천원)보다 ${Math.round((1 - ratio) * 100)}% 절약한 날이에요. 매일 이렇게 아끼면 한 달에 약 ${Math.round(monthSaved / 10000)}만원이 추가로 모여요.`,
+      text: `평소(${w(avgDaily)})보다 ${Math.round((1 - ratio) * 100)}% 절약한 날이에요. 매일 이렇게 아끼면 한 달에 약 ${w(monthSaved)}이 추가로 모여요.`,
       type: 'praise',
     })
   }
@@ -131,13 +130,13 @@ function getDayInsights(
       const topCatOfDow = sorted[0]
       comments.push({
         emoji: '📅',
-        text: `${DAY_LABELS[dow]}요일 평균(${Math.round(avgDow / 1000)}천원)보다 ${Math.round((dowRatio - 1) * 100)}% 더 썼어요. 최근 ${sameDowEntries.length}번의 ${DAY_LABELS[dow]}요일 중 이번이 가장 높아요. ${topCatOfDow ? `특히 ${topCatOfDow[0]} 지출(${Math.round(topCatOfDow[1] / 1000)}천원)이 주된 원인이에요.` : ''}`,
+        text: `${DAY_LABELS[dow]}요일 평균(${w(avgDow)})보다 ${Math.round((dowRatio - 1) * 100)}% 더 썼어요. 최근 ${sameDowEntries.length}번의 ${DAY_LABELS[dow]}요일 중 이번이 가장 높아요. ${topCatOfDow ? `특히 ${topCatOfDow[0]} 지출(${w(topCatOfDow[1])})이 주된 원인이에요.` : ''}`,
         type: 'insight',
       })
     } else if (dowRatio <= 0.6 && dayTotal > 0) {
       comments.push({
         emoji: '📅',
-        text: `${DAY_LABELS[dow]}요일 치고 지출이 적은 날이에요. 평소 ${DAY_LABELS[dow]}요일(${Math.round(avgDow / 1000)}천원)보다 ${Math.round((1 - dowRatio) * 100)}% 절약했어요.`,
+        text: `${DAY_LABELS[dow]}요일 치고 지출이 적은 날이에요. 평소 ${DAY_LABELS[dow]}요일(${w(avgDow)})보다 ${Math.round((1 - dowRatio) * 100)}% 절약했어요.`,
         type: 'praise',
       })
     }
@@ -151,10 +150,10 @@ function getDayInsights(
     const catAvg = catAvgEntries.length > 0
       ? catAvgEntries.reduce((s, [, v]) => s + v, 0) / catAvgEntries.length
       : 0
-    const catRatioStr = catAvg > 0 ? `, 이 카테고리 일평균(${Math.round(catAvg / 1000)}천원)보다 ${Math.round((topCat[1] / catAvg - 1) * 100)}% 높아요` : ''
+    const catRatioStr = catAvg > 0 ? `, 이 카테고리 일평균(${w(catAvg)})보다 ${Math.round((topCat[1] / catAvg - 1) * 100)}% 높아요` : ''
     comments.push({
       emoji: '🔍',
-      text: `오늘 지출의 ${Math.round(topPct)}%인 ${Math.round(topCat[1] / 1000)}천원이 ${topCat[0]}에 집중됐어요${catRatioStr}. ${sorted.length > 1 ? `나머지 ${sorted.length - 1}개 항목은 ${Math.round((dayTotal - topCat[1]) / 1000)}천원이에요.` : ''}`,
+      text: `오늘 지출의 ${Math.round(topPct)}%인 ${w(topCat[1])}이 ${topCat[0]}에 집중됐어요${catRatioStr}. ${sorted.length > 1 ? `나머지 ${sorted.length - 1}개 항목은 ${w(dayTotal - topCat[1])}이에요.` : ''}`,
       type: 'insight',
     })
   }
@@ -175,6 +174,10 @@ function getDayInsights(
   }
 
   return comments
+}
+
+function w(n: number) {
+  return Math.round(n).toLocaleString('ko-KR') + '원'
 }
 
 function getDayColor(total: number) {

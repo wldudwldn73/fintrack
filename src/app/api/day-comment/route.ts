@@ -38,24 +38,33 @@ export async function POST(req: NextRequest) {
   const isMonthEnd = dayOfMonth >= 25
   const isMonthStart = dayOfMonth <= 5
 
+  const dowName = DOW_KR[dow] + '요일'
+  const dayType = isWeekend ? '주말' : '평일'
+
   const prompt = `당신은 한국 개인 재무 코치입니다. 사용자의 하루 소비를 분석해 JSON으로 응답하세요.
 
-소비 카테고리: ${catList}
-${contextLines.join('\n')}
-${isWeekend ? '- 주말' : '- 평일'}${isMonthEnd ? '\n- 월말' : isMonthStart ? '\n- 월초' : ''}
+[오늘 정보]
+- 요일: ${dowName} (${dayType}) ← 반드시 이 요일·평일/주말 정보를 situation에 반영하세요
+- 소비 카테고리: ${catList}
+${contextLines.slice(1).join('\n')}${isMonthEnd ? '\n- 월말' : isMonthStart ? '\n- 월초' : ''}
 
-카테고리 상황 힌트:
+[카테고리 상황 힌트 — 평일/주말을 반드시 구분해서 적용하세요]
+평일:
+- 카페+식비 → 점심·저녁 외식한 바쁜 하루
+- 교통+식비 → 이동이 많았던 업무일
+- 편의점 위주 → 여유 없이 빠르게 해결한 날
+- 쇼핑 → 필요한 걸 퇴근 후 장만한 날
+주말:
 - 카페+쇼핑 → 여유로운 외출
-- 식비+카페 → 누군가와 함께한 시간
-- 교통+식비 → 이동이 많은 날
-- 편의점 위주 → 바쁘거나 집 근처
-- 문화+식비 → 문화 활동을 즐긴 날
+- 식비+문화 → 나들이나 여가를 즐긴 날
+- 편의점 위주 → 집에서 조용히 쉰 날
+공통:
 - 의료 → 건강을 챙긴 날
 - 교육 → 성장에 투자한 날
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {
-  "situation": "그날의 생활·분위기를 추론한 한 문장 (숫자 금지, 따뜻한 어조)",
+  "situation": "${dowName} ${dayType}의 생활·분위기를 추론한 한 문장 (숫자 금지, 따뜻한 어조)",
   "pattern": "소비 패턴이나 특이점 한 문장 (숫자 금지, 판단 금지)",
   "tip": "가벼운 행동 팁 또는 응원 한 문장"
 }`
