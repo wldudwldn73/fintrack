@@ -63,10 +63,10 @@ function getDayInsights(
   if (dayTotal === 0) {
     if (hasIncome) return [{
       emoji: '💰',
-      text: `수입 ${(incomeTotal / 10000).toFixed(1)}만원이 들어온 날이에요. 선저축 후소비 원칙대로 일부를 저축 계좌로 자동이체하면 소비 유혹을 줄일 수 있어요.`,
+      text: `수입이 들어온 날이에요. 받은 즉시 일부를 저축 계좌로 옮기면, 남은 돈 안에서 소비하는 습관이 자연스럽게 만들어져요.`,
       type: 'praise',
     }]
-    return [{ emoji: '✨', text: '지출이 없는 날이에요. 이런 날이 한 달에 5일만 생겨도 평균 15~20만원을 추가 절약할 수 있어요!', type: 'praise' }]
+    return [{ emoji: '✨', text: '지출이 없는 날이에요. 이런 날이 생기는 건 의식적인 절제 덕분이에요. 그냥 넘어가지 않고 인식하는 것 자체가 소비 습관 개선의 시작이에요.', type: 'praise' }]
   }
 
   const comments: DayComment[] = []
@@ -165,13 +165,12 @@ function getDayInsights(
     if (tip) comments.push({ emoji: '💡', text: tip, type: 'tip' })
   }
 
-  // 5. 수입+지출 동시인 날 요약
+  // 5. 수입+지출 동시인 날 (급여일 등) — 금액 언급 없이 맥락만
   if (hasIncome && dayTotal > 0 && comments.length < 2) {
-    const net = incomeTotal - dayTotal
     comments.push({
-      emoji: net >= 0 ? '💚' : '💸',
-      text: `오늘 수입 ${Math.round(incomeTotal / 1000)}천원 중 ${Math.round(dayTotal / 1000)}천원을 지출했어요. 순 ${net >= 0 ? '이익' : '손실'} ${Math.abs(Math.round(net / 1000))}천원이에요.`,
-      type: net >= 0 ? 'praise' : 'warning',
+      emoji: '📥',
+      text: '수입과 지출이 같은 날 발생했어요. 수입이 들어오는 날 지출도 몰리는 패턴이 있다면, 자동이체로 저축을 먼저 챙겨두는 게 효과적이에요.',
+      type: 'tip',
     })
   }
 
