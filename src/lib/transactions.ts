@@ -98,6 +98,11 @@ export async function excludeTransactionsByKeyword(
   return (data ?? []).map((r: { id: string }) => r.id)
 }
 
+export async function updateTransactionType(id: string, type: string, category: string): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ type, category }).eq('id', id)
+  if (error) throw error
+}
+
 /** Soft delete — sets deleted=true so the row stays in the DB */
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').update({ deleted: true }).eq('id', id)

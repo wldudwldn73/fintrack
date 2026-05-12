@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { type User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import MonthlySummary from '@/components/MonthlySummary'
@@ -16,7 +16,8 @@ import CalendarTab from '@/components/CalendarTab'
 import LearnedCategoriesModal from '@/components/LearnedCategoriesModal'
 import CoachModal from '@/components/CoachModal'
 import { Transaction, TransactionInsert, Budget } from '@/lib/types'
-import { getTransactions, addTransaction, addTransactions, deleteTransaction } from '@/lib/transactions'
+import { getTransactions, addTransaction, addTransactions, deleteTransaction, updateTransactionType } from '@/lib/transactions'
+import IncomeCandidateBanner, { INCOME_KEYWORDS, loadDismissed, saveDismissed } from '@/components/IncomeCandidateBanner'
 import { getBudgets } from '@/lib/budget'
 import { generateInsights } from '@/lib/insights'
 
@@ -35,6 +36,9 @@ export default function Home() {
   const [showCoach, setShowCoach] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
+  const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(new Set())
+
+  useEffect(() => { setDismissedIncome(loadDismissed()) }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
@@ -114,9 +118,33 @@ export default function Home() {
     setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, is_excluded: true } : t))
   }
 
+  async function handleIncomeConfirm(id: string, category: string) {
+    await updateTransactionType(id, 'income', category)
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, type: 'income' as const, category } : t))
+  }
+
+  function handleIncomeDismiss(description: string) {
+    const next = new Set(dismissedIncome)
+    next.add(description)
+    setDismissedIncome(next)
+    saveDismissed(next)
+  }
+
   // 지출 제외된 항목은 분석에서 제외
   const activeTransactions = transactions.filter(t => !t.is_excluded)
   const insights = generateInsights(activeTransactions, prevTransactions.filter(t => !t.is_excluded))
+
+  // 수입 후보: expense이지만 수입 키워드가 포함된 항목 (dismissedIncome 제외)
+  const incomeCandidates = useMemo(() => {
+    if (loading) return []
+    return transactions.filter(t =>
+      t.type === 'expense' &&
+      !t.is_excluded &&
+      t.description &&
+      INCOME_KEYWORDS.some(kw => t.description!.includes(kw)) &&
+      !dismissedIncome.has(t.description!)
+    )
+  }, [transactions, loading, dismissedIncome])
 
   const TABS = [
     { key: 'list' as const, label: '달력' },
@@ -195,6 +223,17 @@ export default function Home() {
         {!loading && insights.length > 0 && (
           <div className="anim-up-2">
             <InsightCards insights={insights} />
+          </div>
+        )}
+
+        {/* 수입 후보 확인 */}
+        {!loading && incomeCandidates.length > 0 && (
+          <div className="anim-up-2">
+            <IncomeCandidateBanner
+              candidates={incomeCandidates}
+              onConfirm={handleIncomeConfirm}
+              onDismiss={handleIncomeDismiss}
+            />
           </div>
         )}
 
