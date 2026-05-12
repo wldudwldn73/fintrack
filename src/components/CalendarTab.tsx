@@ -47,24 +47,31 @@ const CATEGORY_TIPS: Record<string, string> = {
   의료:   '정기 검진은 큰 의료비를 예방하는 투자예요.',
 }
 
-function getDayInsight(
+function getDayInsights(
   selectedDate: string,
   selectedTxs: Transaction[],
   allTxs: Transaction[],
-): DayComment | null {
+): DayComment[] {
   const expense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded)
   const dayTotal = expense.reduce((s, t) => s + t.amount, 0)
   const hasIncome = selectedTxs.some(t => t.type === 'income')
+  const incomeTotal = selectedTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const isFuture = new Date(selectedDate + 'T00:00:00') > new Date()
 
-  if (isFuture) return null
+  if (isFuture) return []
 
   if (dayTotal === 0) {
-    if (hasIncome) return { emoji: '💰', text: '수입이 들어온 날이에요. 자동이체로 미리 저축 계좌에 넣어두는 게 효과적이에요.', type: 'praise' }
-    return { emoji: '✨', text: '지출이 없는 날이에요. 이런 날이 모여 저축이 만들어져요!', type: 'praise' }
+    if (hasIncome) return [{
+      emoji: '💰',
+      text: `수입 ${(incomeTotal / 10000).toFixed(1)}만원이 들어온 날이에요. 선저축 후소비 원칙대로 일부를 저축 계좌로 자동이체하면 소비 유혹을 줄일 수 있어요.`,
+      type: 'praise',
+    }]
+    return [{ emoji: '✨', text: '지출이 없는 날이에요. 이런 날이 한 달에 5일만 생겨도 평균 15~20만원을 추가 절약할 수 있어요!', type: 'praise' }]
   }
 
-  // 이번 달 일평균 계산 (같은 날 제외)
+  const comments: DayComment[] = []
+
+  // 이번 달 일평균 계산 (지출 있는 날 기준, 선택일 제외)
   const allExpenses = allTxs.filter(t => t.type === 'expense' && !t.is_excluded)
   const expenseByDate = allExpenses.reduce<Record<string, number>>((acc, t) => {
     acc[t.date] = (acc[t.date] ?? 0) + t.amount
@@ -77,65 +84,98 @@ function getDayInsight(
 
   // 같은 요일 평균
   const dow = new Date(selectedDate + 'T00:00:00').getDay()
-  const sameDowAmts = otherDates
-    .filter(([d]) => new Date(d + 'T00:00:00').getDay() === dow)
-    .map(([, v]) => v)
-  const avgDow = sameDowAmts.length >= 2
-    ? sameDowAmts.reduce((s, v) => s + v, 0) / sameDowAmts.length
+  const sameDowEntries = otherDates.filter(([d]) => new Date(d + 'T00:00:00').getDay() === dow)
+  const avgDow = sameDowEntries.length >= 2
+    ? sameDowEntries.reduce((s, [, v]) => s + v, 0) / sameDowEntries.length
     : null
 
-  // 카테고리 집중도
+  // 카테고리별 분석
   const catMap: Record<string, number> = {}
   for (const t of expense) catMap[t.category] = (catMap[t.category] ?? 0) + t.amount
   const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1])
   const topCat = sorted[0]
   const topPct = topCat ? (topCat[1] / dayTotal) * 100 : 0
 
+  // 이번 달 해당 카테고리 일평균
+  const catDailyMap: Record<string, Record<string, number>> = {}
+  for (const t of allExpenses) {
+    if (!catDailyMap[t.category]) catDailyMap[t.category] = {}
+    catDailyMap[t.category][t.date] = (catDailyMap[t.category][t.date] ?? 0) + t.amount
+  }
+
   const ratio = avgDaily > 0 ? dayTotal / avgDaily : 0
 
-  // 1순위: 일평균 대비 고지출
-  if (avgDaily > 0 && ratio >= 2.5) {
-    return {
+  // 1. 일평균 대비 고지출 분석
+  if (avgDaily > 0 && ratio >= 2) {
+    const topCatsStr = sorted.slice(0, 2).map(([c, v]) => `${c} ${Math.round(v / 1000)}천원`).join(', ')
+    comments.push({
       emoji: '⚠️',
-      text: `오늘은 이번 달 일평균(${Math.round(avgDaily / 10000)}만원)보다 ${ratio.toFixed(1)}배 더 썼어요. 특별한 지출이 있었나요?`,
+      text: `이번 달 일평균(${Math.round(avgDaily / 1000)}천원)보다 ${ratio.toFixed(1)}배 더 쓴 날이에요. 주요 지출은 ${topCatsStr}이에요. 충동 지출이 있었다면 다음 날 하루 무지출 챌린지로 균형을 맞춰보세요.`,
       type: 'warning',
-    }
-  }
-
-  // 2순위: 같은 요일 패턴
-  if (avgDow !== null && dayTotal > avgDow * 1.8) {
-    const pctMore = Math.round((dayTotal / avgDow - 1) * 100)
-    return {
-      emoji: '📅',
-      text: `${DAY_LABELS[dow]}요일 평균보다 ${pctMore}% 더 썼어요. ${DAY_LABELS[dow]}요일 소비 패턴이 반복되고 있어요.`,
-      type: 'insight',
-    }
-  }
-
-  // 3순위: 카테고리 집중
-  if (topPct >= 75 && dayTotal >= 20000) {
-    return {
-      emoji: '🔍',
-      text: `오늘 지출의 ${Math.round(topPct)}%가 ${topCat[0]}에 집중됐어요. ${topCat[0]} 지출이 반복되는지 확인해보세요.`,
-      type: 'insight',
-    }
-  }
-
-  // 4순위: 절약 칭찬
-  if (avgDaily > 0 && ratio <= 0.5 && dayTotal > 0) {
+    })
+  } else if (avgDaily > 0 && ratio <= 0.5) {
+    // 절약 칭찬
     const saved = Math.round((avgDaily - dayTotal) / 1000)
-    return {
+    const monthSaved = saved * 20 // 한 달 20일 적용 시
+    comments.push({
       emoji: '🌟',
-      text: `오늘은 평소보다 절반 이하로 썼어요. 절약한 ${saved}천원이 저축으로 이어질 수 있어요!`,
+      text: `평소(${Math.round(avgDaily / 1000)}천원)보다 ${Math.round((1 - ratio) * 100)}% 절약한 날이에요. 매일 이렇게 아끼면 한 달에 약 ${Math.round(monthSaved / 10000)}만원이 추가로 모여요.`,
       type: 'praise',
+    })
+  }
+
+  // 2. 요일 패턴 인식
+  if (avgDow !== null) {
+    const dowRatio = dayTotal / avgDow
+    if (dowRatio >= 1.7) {
+      const topCatOfDow = sorted[0]
+      comments.push({
+        emoji: '📅',
+        text: `${DAY_LABELS[dow]}요일 평균(${Math.round(avgDow / 1000)}천원)보다 ${Math.round((dowRatio - 1) * 100)}% 더 썼어요. 최근 ${sameDowEntries.length}번의 ${DAY_LABELS[dow]}요일 중 이번이 가장 높아요. ${topCatOfDow ? `특히 ${topCatOfDow[0]} 지출(${Math.round(topCatOfDow[1] / 1000)}천원)이 주된 원인이에요.` : ''}`,
+        type: 'insight',
+      })
+    } else if (dowRatio <= 0.6 && dayTotal > 0) {
+      comments.push({
+        emoji: '📅',
+        text: `${DAY_LABELS[dow]}요일 치고 지출이 적은 날이에요. 평소 ${DAY_LABELS[dow]}요일(${Math.round(avgDow / 1000)}천원)보다 ${Math.round((1 - dowRatio) * 100)}% 절약했어요.`,
+        type: 'praise',
+      })
     }
   }
 
-  // 5순위: 카테고리별 행동경제학 팁
-  const tip = topCat ? CATEGORY_TIPS[topCat[0]] : null
-  if (tip) return { emoji: '💡', text: tip, type: 'tip' }
+  // 3. 카테고리 집중도 분석
+  if (topPct >= 65 && dayTotal >= 15000 && comments.length < 2) {
+    const catAvgEntries = catDailyMap[topCat[0]]
+      ? Object.entries(catDailyMap[topCat[0]]).filter(([d]) => d !== selectedDate)
+      : []
+    const catAvg = catAvgEntries.length > 0
+      ? catAvgEntries.reduce((s, [, v]) => s + v, 0) / catAvgEntries.length
+      : 0
+    const catRatioStr = catAvg > 0 ? `, 이 카테고리 일평균(${Math.round(catAvg / 1000)}천원)보다 ${Math.round((topCat[1] / catAvg - 1) * 100)}% 높아요` : ''
+    comments.push({
+      emoji: '🔍',
+      text: `오늘 지출의 ${Math.round(topPct)}%인 ${Math.round(topCat[1] / 1000)}천원이 ${topCat[0]}에 집중됐어요${catRatioStr}. ${sorted.length > 1 ? `나머지 ${sorted.length - 1}개 항목은 ${Math.round((dayTotal - topCat[1]) / 1000)}천원이에요.` : ''}`,
+      type: 'insight',
+    })
+  }
 
-  return null
+  // 4. 행동경제학 팁 (코멘트가 부족할 때 보충)
+  if (comments.length === 0 && topCat) {
+    const tip = CATEGORY_TIPS[topCat[0]]
+    if (tip) comments.push({ emoji: '💡', text: tip, type: 'tip' })
+  }
+
+  // 5. 수입+지출 동시인 날 요약
+  if (hasIncome && dayTotal > 0 && comments.length < 2) {
+    const net = incomeTotal - dayTotal
+    comments.push({
+      emoji: net >= 0 ? '💚' : '💸',
+      text: `오늘 수입 ${Math.round(incomeTotal / 1000)}천원 중 ${Math.round(dayTotal / 1000)}천원을 지출했어요. 순 ${net >= 0 ? '이익' : '손실'} ${Math.abs(Math.round(net / 1000))}천원이에요.`,
+      type: net >= 0 ? 'praise' : 'warning',
+    })
+  }
+
+  return comments
 }
 
 function getDayColor(total: number) {
@@ -197,8 +237,8 @@ export default function CalendarTab({
   const selectedTxs = transactions.filter(t => t.date === selectedDate)
   const selectedExpense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded).reduce((s, t) => s + t.amount, 0)
   const selectedIncome = selectedTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const dayInsight = useMemo(
-    () => getDayInsight(selectedDate, selectedTxs, transactions),
+  const dayInsights = useMemo(
+    () => getDayInsights(selectedDate, selectedTxs, transactions),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedDate, transactions],
   )
@@ -363,6 +403,21 @@ export default function CalendarTab({
         </div>
       </div>
 
+      {/* AI 코멘트 카드 */}
+      {dayInsights.map((insight, i) => {
+        const s = COMMENT_STYLE[insight.type]
+        return (
+          <div
+            key={i}
+            className="rounded-2xl px-4 py-3 flex items-start gap-3"
+            style={{ background: s.bg, border: `1px solid ${s.border}` }}
+          >
+            <span className="text-base shrink-0 mt-0.5">{insight.emoji}</span>
+            <p className={`text-xs leading-relaxed ${s.text}`}>{insight.text}</p>
+          </div>
+        )
+      })}
+
       {/* 해당 날짜 거래 목록 */}
       {selectedTxs.length === 0 ? (
         <div className="glass rounded-2xl py-10 text-center">
@@ -503,20 +558,6 @@ export default function CalendarTab({
           })}
         </div>
       )}
-
-      {/* AI 코멘트 카드 */}
-      {dayInsight && (() => {
-        const s = COMMENT_STYLE[dayInsight.type]
-        return (
-          <div
-            className="rounded-2xl px-4 py-3 flex items-start gap-3"
-            style={{ background: s.bg, border: `1px solid ${s.border}` }}
-          >
-            <span className="text-lg shrink-0 mt-0.5">{dayInsight.emoji}</span>
-            <p className={`text-xs leading-relaxed ${s.text}`}>{dayInsight.text}</p>
-          </div>
-        )
-      })()}
 
       {/* 일괄 카테고리 변경 프롬프트 */}
       {bulkPrompt && (
