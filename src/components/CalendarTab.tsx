@@ -181,6 +181,58 @@ function w(n: number) {
   return Math.round(n).toLocaleString('ko-KR') + '원'
 }
 
+interface DonutSlice { category: string; amount: number; color: string; pct: number }
+
+function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) {
+  const SIZE = 76, CX = 38, CY = 38, R = 26, SW = 11
+  const C = 2 * Math.PI * R
+  let cum = 0
+
+  return (
+    <div className="flex items-center gap-3">
+      <svg width={SIZE} height={SIZE} className="shrink-0">
+        {/* background ring */}
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={SW} />
+        {slices.map((s, i) => {
+          const arc = C * s.pct
+          const offset = -(cum * C)
+          cum += s.pct
+          return (
+            <circle
+              key={i}
+              cx={CX} cy={CY} r={R}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={SW}
+              strokeDasharray={`${arc} ${C}`}
+              strokeDashoffset={offset}
+              strokeLinecap="butt"
+              transform={`rotate(-90 ${CX} ${CY})`}
+              style={{ filter: `drop-shadow(0 0 3px ${s.color}60)` }}
+            />
+          )
+        })}
+        {/* center total */}
+        <text x={CX} y={CY - 4} textAnchor="middle" fill="white" fontSize="9" fontWeight="700">
+          {total >= 10000 ? `${Math.round(total / 10000)}만` : `${Math.round(total / 1000)}천`}
+        </text>
+        <text x={CX} y={CY + 7} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="7">원</text>
+      </svg>
+
+      {/* legend */}
+      <div className="flex-1 grid grid-cols-2 gap-x-3 gap-y-1.5">
+        {slices.map(s => (
+          <div key={s.category} className="flex items-center gap-1.5 min-w-0">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+            <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{s.category}</span>
+            <span className="text-[10px] font-semibold text-white/70 ml-auto shrink-0">{Math.round(s.pct * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function getDayColor(total: number) {
   if (total <= 0) return null
   if (total < 30000) return { bar: 'bg-emerald-400/70', text: 'text-emerald-400' }
@@ -256,6 +308,22 @@ export default function CalendarTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedDate, transactions],
   )
+
+  const donutSlices = useMemo(() => {
+    const expense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded)
+    if (expense.length === 0) return []
+    const catMap: Record<string, number> = {}
+    for (const t of expense) catMap[t.category] = (catMap[t.category] ?? 0) + t.amount
+    const total = Object.values(catMap).reduce((s, v) => s + v, 0)
+    return Object.entries(catMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category, amount]) => ({
+        category, amount,
+        color: getCategoryColor(category).dot,
+        pct: amount / total,
+      }))
+  }, [selectedTxs])
 
   async function fetchStory(date: string, txs: Transaction[]) {
     const expense = txs.filter(t => t.type === 'expense' && !t.is_excluded)
@@ -470,6 +538,13 @@ export default function CalendarTab({
         </div>
       </div>
 
+      {/* 도넛 차트 */}
+      {donutSlices.length > 1 && (
+        <div className="glass rounded-2xl px-4 py-3">
+          <DonutChart slices={donutSlices} total={selectedExpense} />
+        </div>
+      )}
+
       {/* AI 스토리텔링 카드 */}
       {storyLoading ? (
         <div className="rounded-2xl overflow-hidden"
@@ -576,7 +651,7 @@ export default function CalendarTab({
                             : 'glass-sm text-white/45 hover:text-white/80'
                         }`}
                       >
-                        {editState.is_excluded ? '지출 제외 ✓' : '지출 포함'}
+                        {editState.is_excluded ? '항목 제외 ✓' : '항목 제외'}
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
@@ -625,7 +700,7 @@ export default function CalendarTab({
                           <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
                         )}
                         {tx.is_excluded && (
-                          <span className="text-xs bg-zinc-500/20 text-zinc-400 px-1.5 py-0.5 rounded-full shrink-0">지출 제외</span>
+                          <span className="text-xs bg-zinc-500/20 text-zinc-400 px-1.5 py-0.5 rounded-full shrink-0">항목 제외</span>
                         )}
                         {tx.payment_method && (
                           <span className="text-xs glass-sm px-2 py-0.5 rounded-full shrink-0" style={{ color: 'var(--text-muted)' }}>
