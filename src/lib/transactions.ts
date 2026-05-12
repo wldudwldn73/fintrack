@@ -73,6 +73,31 @@ export async function updateTransactionExcluded(id: string, is_excluded: boolean
   if (error) throw error
 }
 
+export async function excludeTransactionsByKeyword(
+  keyword: string,
+  scope: 'all' | 'current_month',
+  year?: number,
+  month?: number,
+): Promise<string[]> {
+  let query = supabase
+    .from('transactions')
+    .update({ is_excluded: true })
+    .ilike('description', `%${keyword}%`)
+    .eq('is_excluded', false)
+    .eq('deleted', false)
+    .select('id')
+
+  if (scope === 'current_month' && year !== undefined && month !== undefined) {
+    const from = `${year}-${String(month).padStart(2, '0')}-01`
+    const to   = new Date(year, month, 0).toISOString().slice(0, 10)
+    query = query.gte('date', from).lte('date', to)
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).map((r: { id: string }) => r.id)
+}
+
 /** Soft delete — sets deleted=true so the row stays in the DB */
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from('transactions').update({ deleted: true }).eq('id', id)

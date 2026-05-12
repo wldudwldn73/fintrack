@@ -8,6 +8,7 @@ import {
   updateTransactionCategoryByKeyword,
   updateTransactionRecurring,
   updateTransactionExcluded,
+  excludeTransactionsByKeyword,
   deleteTransaction,
 } from '@/lib/transactions'
 import CategoryPicker, { type CustomCat } from '@/components/CategoryPicker'
@@ -21,6 +22,7 @@ interface Props {
   onBulkCategoryChange: (ids: string[], category: string) => void
   onRecurringChange: (id: string, is_recurring: boolean) => void
   onExcludedChange: (id: string, is_excluded: boolean) => void
+  onBulkExcludedChange: (ids: string[]) => void
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -249,7 +251,7 @@ function fmt(n: number) {
 
 export default function CalendarTab({
   transactions, year, month,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -266,6 +268,7 @@ export default function CalendarTab({
   const [editState, setEditState] = useState<{ category: string; is_recurring: boolean; is_excluded: boolean } | null>(null)
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [bulkExcludePrompt, setBulkExcludePrompt] = useState<{ keyword: string; count: number } | null>(null)
   const [saving, setSaving] = useState(false)
   const [storyCache, setStoryCache] = useState<Record<string, { situation?: string; pattern?: string; tip?: string } | null>>({})
   const [storyLoading, setStoryLoading] = useState(false)
@@ -438,6 +441,14 @@ export default function CalendarTab({
         const same = transactions.filter(t => t.id !== tx.id && t.description?.includes(keyword) && t.category !== editState.category)
         if (same.length > 0) setBulkPrompt({ keyword, category: editState.category, count: same.length })
       }
+
+      // 항목 제외로 변경됐을 때 — 같은 설명어의 다른 항목들도 제외할지 묻기
+      if (editState.is_excluded && !tx.is_excluded && tx.description?.trim()) {
+        const keyword = tx.description.trim()
+        const same = transactions.filter(t => t.id !== tx.id && !t.is_excluded && t.description?.includes(keyword))
+        if (same.length > 0) setBulkExcludePrompt({ keyword, count: same.length })
+      }
+
       setEditingId(null)
       setEditState(null)
     } finally {
@@ -461,6 +472,13 @@ export default function CalendarTab({
       body: JSON.stringify({ merchant: bulkPrompt.keyword, category: bulkPrompt.category }),
     })
     setBulkPrompt(null)
+  }
+
+  async function handleBulkExclude(scope: 'current_month' | 'all') {
+    if (!bulkExcludePrompt) return
+    const updatedIds = await excludeTransactionsByKeyword(bulkExcludePrompt.keyword, scope, year, month)
+    onBulkExcludedChange(updatedIds)
+    setBulkExcludePrompt(null)
   }
 
   const selectedDStr = (() => {
@@ -779,6 +797,43 @@ export default function CalendarTab({
                 className="w-full py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 transition-colors"
               >
                 현재 항목만 변경
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 일괄 항목 제외 프롬프트 */}
+      {bulkExcludePrompt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 px-4" onClick={() => setBulkExcludePrompt(null)}>
+          <div className="glass rounded-2xl p-6 w-full sm:max-w-sm space-y-4" onClick={e => e.stopPropagation()}
+            style={{ border: '1px solid rgba(113,113,122,0.35)' }}>
+            <div>
+              <p className="text-sm font-semibold text-white mb-1">일괄 항목 제외</p>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                <span className="text-white font-medium">"{bulkExcludePrompt.keyword}"</span>이 포함된 항목{' '}
+                <span className="text-zinc-300 font-semibold">{bulkExcludePrompt.count}건</span>도 함께 지출 분석에서 제외할까요?
+              </p>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleBulkExclude('current_month')}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
+                style={{ background: 'linear-gradient(135deg, #52525b, #3f3f46)' }}
+              >
+                이번 달 {bulkExcludePrompt.count}건 모두 제외
+              </button>
+              <button
+                onClick={() => handleBulkExclude('all')}
+                className="w-full py-2.5 rounded-xl text-sm font-medium glass-sm text-white/70 hover:text-white transition-colors"
+              >
+                전체 기간 모두 제외
+              </button>
+              <button
+                onClick={() => setBulkExcludePrompt(null)}
+                className="w-full py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 transition-colors"
+              >
+                현재 항목만 제외
               </button>
             </div>
           </div>

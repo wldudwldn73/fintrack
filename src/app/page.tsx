@@ -110,6 +110,10 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, is_excluded } : t))
   }
 
+  function handleBulkExcludedChange(ids: string[]) {
+    setTransactions(prev => prev.map(t => ids.includes(t.id) ? { ...t, is_excluded: true } : t))
+  }
+
   // 지출 제외된 항목은 분석에서 제외
   const activeTransactions = transactions.filter(t => !t.is_excluded)
   const insights = generateInsights(activeTransactions, prevTransactions.filter(t => !t.is_excluded))
@@ -228,6 +232,7 @@ export default function Home() {
               onBulkCategoryChange={handleBulkCategoryChange}
               onRecurringChange={handleRecurringChange}
               onExcludedChange={handleExcludedChange}
+              onBulkExcludedChange={handleBulkExcludedChange}
             />
           </div>
         ) : tab === 'category' ? (
