@@ -420,6 +420,7 @@ export default function Home() {
               widgets={widgets}
               onWidgetSave={handleWidgetSave}
               onWidgetDelete={handleWidgetDelete}
+              onAmountChange={handleAmountChange}
             />
           </div>
         )}

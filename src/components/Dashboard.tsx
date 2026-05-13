@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
-import { updateTransactionCategory } from '@/lib/transactions'
+import { updateTransactionCategory, updateTransactionAmount } from '@/lib/transactions'
 import { type CustomCat } from '@/components/CategoryPicker'
 import { type CategoryWidget } from '@/lib/categoryWidgets'
 
@@ -18,6 +18,52 @@ interface Props {
   widgets: CategoryWidget[]
   onWidgetSave: (w: Omit<CategoryWidget, 'id'> & { id?: string }) => Promise<void>
   onWidgetDelete: (id: string) => Promise<void>
+  onAmountChange: (id: string, amount: number) => void
+}
+
+function InlineAmount({ tx, onAmountChange, className }: {
+  tx: Transaction
+  onAmountChange: (id: string, amount: number) => void
+  className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+
+  async function save() {
+    const n = Number(value.replace(/,/g, ''))
+    if (!isNaN(n) && n > 0 && n !== tx.amount) {
+      await updateTransactionAmount(tx.id, n)
+      onAmountChange(tx.id, n)
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); save() }
+          if (e.key === 'Escape') setEditing(false)
+        }}
+        className="w-24 text-right glass-sm rounded-lg px-2 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+      />
+    )
+  }
+
+  return (
+    <span
+      className={`cursor-pointer select-none ${className ?? ''}`}
+      onDoubleClick={() => { setEditing(true); setValue(String(tx.amount)) }}
+      title="더블클릭하여 금액 수정"
+    >
+      {tx.amount.toLocaleString('ko-KR')}원
+    </span>
+  )
 }
 
 function getWeekOfMonth(dateStr: string, year: number, month: number) {
@@ -252,7 +298,7 @@ function WidgetCard({
   )
 }
 
-export default function Dashboard({ transactions, year, month, customCats, onCategoryChange, widgets, onWidgetSave, onWidgetDelete }: Props) {
+export default function Dashboard({ transactions, year, month, customCats, onCategoryChange, widgets, onWidgetSave, onWidgetDelete, onAmountChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const expenses         = transactions.filter(t => t.type === 'expense')
@@ -395,7 +441,7 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
                     <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cc.bg} ${cc.text}`}>{tx.category}</span>
                     <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{tx.description ?? '(내역없음)'}</span>
                   </div>
-                  <span className="text-sm font-semibold text-amber-300 ml-2 shrink-0">{tx.amount.toLocaleString('ko-KR')}원</span>
+                  <InlineAmount tx={tx} onAmountChange={onAmountChange} className="text-sm font-semibold text-amber-300 ml-2 shrink-0" />
                 </div>
               )
             })}
@@ -464,7 +510,7 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
                         )}
                         <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{tx.description ?? '(내역없음)'}</span>
                       </div>
-                      <span className="text-sm text-white/75 ml-2 shrink-0">{tx.amount.toLocaleString('ko-KR')}원</span>
+                      <InlineAmount tx={tx} onAmountChange={onAmountChange} className="text-sm text-white/75 ml-2 shrink-0" />
                     </div>
                   </div>
                 ))}
