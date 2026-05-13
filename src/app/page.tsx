@@ -134,6 +134,10 @@ export default function Home() {
     setTransactions(prev => prev.map(t => map[t.id] !== undefined ? { ...t, sort_order: map[t.id] } : t))
   }
 
+  function handleHiddenChange(id: string, is_hidden: boolean) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, is_hidden } : t))
+  }
+
   async function handleIncomeConfirm(id: string, category: string) {
     await updateTransactionType(id, 'income', category)
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, type: 'income' as const, category } : t))
@@ -172,8 +176,8 @@ export default function Home() {
     saveDismissedSupport(next)
   }
 
-  // 지출 제외된 항목은 분석에서 제외
-  const activeTransactions = transactions.filter(t => !t.is_excluded)
+  // 지출 제외/숨김 항목은 분석에서 제외
+  const activeTransactions = transactions.filter(t => !t.is_excluded && !t.is_hidden)
   const insights = generateInsights(activeTransactions, prevTransactions.filter(t => !t.is_excluded))
 
   // 수입 후보: expense이지만 수입 키워드가 포함된 항목 (dismissedIncome 제외)
@@ -344,6 +348,7 @@ export default function Home() {
               onBulkExcludedChange={handleBulkExcludedChange}
               onMetaChange={handleMetaChange}
               onSortOrderChange={handleSortOrderChange}
+              onHiddenChange={handleHiddenChange}
             />
           </div>
         ) : tab === 'category' ? (

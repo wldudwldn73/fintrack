@@ -8,6 +8,7 @@ import {
   updateTransactionCategoryByKeyword,
   updateTransactionRecurring,
   updateTransactionExcluded,
+  updateTransactionHidden,
   updateTransactionMeta,
   updateTransactionSortOrders,
   excludeTransactionsByKeyword,
@@ -27,6 +28,7 @@ interface Props {
   onBulkExcludedChange: (ids: string[]) => void
   onMetaChange: (id: string, description: string | null, memo: string | null) => void
   onSortOrderChange: (updates: { id: string; sort_order: number }[]) => void
+  onHiddenChange: (id: string, is_hidden: boolean) => void
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -255,7 +257,7 @@ function fmt(n: number) {
 
 export default function CalendarTab({
   transactions, year, month,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onSortOrderChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onSortOrderChange, onHiddenChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -273,12 +275,14 @@ export default function CalendarTab({
     category: string
     is_recurring: boolean
     is_excluded: boolean
+    is_hidden: boolean
     description: string
     memo: string
   } | null>(null)
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineEditValue, setInlineEditValue] = useState('')
   const [reorderMode, setReorderMode] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [bulkExcludePrompt, setBulkExcludePrompt] = useState<{ keyword: string; count: number } | null>(null)
@@ -333,7 +337,7 @@ export default function CalendarTab({
   ]
   while (cells.length % 7 !== 0) cells.push(null)
 
-  const selectedTxs = useMemo(() => {
+  const allSelectedTxs = useMemo(() => {
     const txs = transactions.filter(t => t.date === selectedDate)
     return [...txs].sort((a, b) => {
       const ao = a.sort_order, bo = b.sort_order
@@ -341,6 +345,12 @@ export default function CalendarTab({
       return a.created_at.localeCompare(b.created_at)
     })
   }, [transactions, selectedDate])
+
+  const selectedTxs = useMemo(
+    () => showHidden ? allSelectedTxs : allSelectedTxs.filter(t => !t.is_hidden),
+    [allSelectedTxs, showHidden],
+  )
+  const hiddenCount = useMemo(() => allSelectedTxs.filter(t => t.is_hidden).length, [allSelectedTxs])
   const selectedExpense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded).reduce((s, t) => s + t.amount, 0)
   const selectedIncome = selectedTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const dayInsights = useMemo(
@@ -426,6 +436,7 @@ export default function CalendarTab({
       category: tx.category,
       is_recurring: tx.is_recurring,
       is_excluded: tx.is_excluded,
+      is_hidden: tx.is_hidden,
       description: tx.description ?? '',
       memo: tx.memo ?? '',
     })
@@ -459,6 +470,10 @@ export default function CalendarTab({
       if (editState.is_excluded !== tx.is_excluded) {
         promises.push(updateTransactionExcluded(tx.id, editState.is_excluded))
         onExcludedChange(tx.id, editState.is_excluded)
+      }
+      if (editState.is_hidden !== tx.is_hidden) {
+        promises.push(updateTransactionHidden(tx.id, editState.is_hidden))
+        onHiddenChange(tx.id, editState.is_hidden)
       }
       const newDesc = editState.description.trim() || null
       const newMemo = editState.memo.trim() || null
@@ -718,12 +733,13 @@ export default function CalendarTab({
               ? editState.category !== tx.category
                 || editState.is_recurring !== tx.is_recurring
                 || editState.is_excluded !== tx.is_excluded
+                || editState.is_hidden !== tx.is_hidden
                 || editState.description !== (tx.description ?? '')
                 || editState.memo !== (tx.memo ?? '')
               : false
 
             return (
-              <div key={tx.id} className={`px-4 py-3 group transition-colors flex gap-2 ${tx.is_excluded ? 'opacity-50' : ''}`}>
+              <div key={tx.id} className={`px-4 py-3 group transition-colors flex gap-2 ${tx.is_excluded || tx.is_hidden ? 'opacity-50' : ''}`}>
                 {/* 순서 변경 버튼 */}
                 {reorderMode && !isEditing && (
                   <div className="flex flex-col justify-center gap-0.5 shrink-0">
@@ -790,6 +806,16 @@ export default function CalendarTab({
                       >
                         {editState.is_excluded ? '항목 제외 ✓' : '항목 제외'}
                       </button>
+                      <button
+                        onClick={() => setEditState(s => s ? { ...s, is_hidden: !s.is_hidden } : s)}
+                        className={`text-xs px-2 py-0.5 rounded-full transition-all ${
+                          editState.is_hidden
+                            ? 'bg-violet-500/25 text-violet-300 ring-1 ring-violet-400/20 font-semibold'
+                            : 'glass-sm text-white/45 hover:text-white/80'
+                        }`}
+                      >
+                        {editState.is_hidden ? '🙈 숨김 ✓' : '숨김'}
+                      </button>
                     </div>
                     <div className="flex items-center gap-2">
                       {hasChanged && (
@@ -838,6 +864,9 @@ export default function CalendarTab({
                         )}
                         {tx.is_excluded && (
                           <span className="text-xs bg-zinc-500/20 text-zinc-400 px-1.5 py-0.5 rounded-full shrink-0">항목 제외</span>
+                        )}
+                        {tx.is_hidden && (
+                          <span className="text-xs bg-violet-500/15 text-violet-400 px-1.5 py-0.5 rounded-full shrink-0">숨김</span>
                         )}
                         {tx.payment_method && (
                           <span className="text-xs glass-sm px-2 py-0.5 rounded-full shrink-0" style={{ color: 'var(--text-muted)' }}>
@@ -898,6 +927,17 @@ export default function CalendarTab({
             )
           })}
         </div>
+      )}
+
+      {/* 숨긴 항목 토글 */}
+      {hiddenCount > 0 && (
+        <button
+          onClick={() => setShowHidden(v => !v)}
+          className="w-full py-2 text-xs rounded-xl glass-sm transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {showHidden ? `🙈 숨긴 항목 ${hiddenCount}개 숨기기` : `🙈 숨긴 항목 ${hiddenCount}개 보기`}
+        </button>
       )}
 
       {/* 일괄 카테고리 변경 프롬프트 */}

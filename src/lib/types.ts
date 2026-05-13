@@ -11,6 +11,7 @@ export interface Transaction {
   institution: string | null
   is_recurring: boolean
   is_excluded: boolean
+  is_hidden: boolean
   deleted: boolean
   sort_order: number
   date: string

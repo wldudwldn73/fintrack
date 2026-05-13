@@ -103,6 +103,11 @@ export async function updateTransactionType(id: string, type: string, category: 
   if (error) throw error
 }
 
+export async function updateTransactionHidden(id: string, is_hidden: boolean): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ is_hidden }).eq('id', id)
+  if (error) throw error
+}
+
 export async function updateTransactionSortOrders(updates: { id: string; sort_order: number }[]): Promise<void> {
   await Promise.all(updates.map(({ id, sort_order }) =>
     supabase.from('transactions').update({ sort_order }).eq('id', id)
