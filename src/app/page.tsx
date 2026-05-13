@@ -265,14 +265,6 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowSettings(true)}
-              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-              title="설정"
-            >
-              ⚙️
-            </button>
-            <button
               onClick={() => setShowCoach(true)}
               className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
               style={{ color: 'var(--text-secondary)' }}
@@ -402,6 +394,16 @@ export default function Home() {
           </div>
         ) : (
           <div className="anim-up-4 space-y-4">
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <span>⚙️</span>
+                <span>위젯 관리</span>
+              </button>
+            </div>
             <BudgetCard
               transactions={activeTransactions}
               budgets={budgets}
