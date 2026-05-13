@@ -20,6 +20,8 @@ import { getTransactions, addTransaction, addTransactions, deleteTransaction, up
 import { type CustomCat } from '@/components/CategoryPicker'
 import IncomeCandidateBanner, { INCOME_KEYWORDS, loadDismissed, saveDismissed } from '@/components/IncomeCandidateBanner'
 import { getBudgets } from '@/lib/budget'
+import { getCategoryWidgets, upsertCategoryWidget, deleteCategoryWidget, type CategoryWidget } from '@/lib/categoryWidgets'
+import SettingsModal from '@/components/SettingsModal'
 import { generateInsights } from '@/lib/insights'
 import SupportItemBanner from '@/components/SupportItemBanner'
 import { SUPPORT_KEYWORDS, loadDismissedSupport, saveDismissedSupport, getSupportItems, addSupportItem, type SupportItem } from '@/lib/supportItems'
@@ -43,9 +45,14 @@ export default function Home() {
   const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(new Set())
   const [dismissedSupport, setDismissedSupport] = useState<Set<string>>(new Set())
   const [supportItems, setSupportItems] = useState<SupportItem[]>([])
+  const [widgets, setWidgets] = useState<CategoryWidget[]>([])
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => { setDismissedIncome(loadDismissed()) }, [])
   useEffect(() => { setDismissedSupport(loadDismissedSupport()) }, [])
+  useEffect(() => {
+    getCategoryWidgets().then(setWidgets).catch(() => {})
+  }, [])
   useEffect(() => {
     fetch('/api/custom-categories')
       .then(r => r.json())
@@ -150,6 +157,21 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, amount } : t))
   }
 
+  async function handleWidgetSave(w: Omit<CategoryWidget, 'id'> & { id?: string }) {
+    const withOrder = w.id ? w : { ...w, sort_order: widgets.length }
+    const saved = await upsertCategoryWidget(withOrder)
+    setWidgets(prev => {
+      const exists = prev.find(x => x.id === saved.id)
+      if (exists) return prev.map(x => x.id === saved.id ? saved : x)
+      return [...prev, saved]
+    })
+  }
+
+  async function handleWidgetDelete(id: string) {
+    await deleteCategoryWidget(id)
+    setWidgets(prev => prev.filter(w => w.id !== id))
+  }
+
   async function handleIncomeConfirm(id: string, category: string) {
     await updateTransactionType(id, 'income', category)
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, type: 'income' as const, category } : t))
@@ -242,6 +264,14 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
+              style={{ color: 'var(--text-secondary)' }}
+              title="설정"
+            >
+              ⚙️
+            </button>
             <button
               onClick={() => setShowCoach(true)}
               className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
@@ -385,6 +415,9 @@ export default function Home() {
               month={month}
               customCats={customCats}
               onCategoryChange={handleCategoryChange}
+              widgets={widgets}
+              onWidgetSave={handleWidgetSave}
+              onWidgetDelete={handleWidgetDelete}
             />
           </div>
         )}
@@ -410,6 +443,15 @@ export default function Home() {
           year={year}
           month={month}
           onClose={() => setShowCoach(false)}
+        />
+      )}
+      {showSettings && (
+        <SettingsModal
+          widgets={widgets}
+          customCats={customCats}
+          onWidgetSave={handleWidgetSave}
+          onWidgetDelete={handleWidgetDelete}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

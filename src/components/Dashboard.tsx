@@ -5,8 +5,9 @@ import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import { updateTransactionCategory } from '@/lib/transactions'
 import { type CustomCat } from '@/components/CategoryPicker'
+import { type CategoryWidget } from '@/lib/categoryWidgets'
 
-const LIVING_CATS = ['식비', '카페', '편의점'] as const
+const QUICK_EMOJIS = ['🍽', '🛒', '☕', '🚗', '🏠', '💊', '🎬', '📚', '💳', '💰', '🎁', '👗', '✈️', '📱', '🎮']
 
 interface Props {
   transactions: Transaction[]
@@ -14,6 +15,9 @@ interface Props {
   month: number
   customCats?: CustomCat[]
   onCategoryChange: (id: string, category: string) => void
+  widgets: CategoryWidget[]
+  onWidgetSave: (w: Omit<CategoryWidget, 'id'> & { id?: string }) => Promise<void>
+  onWidgetDelete: (id: string) => Promise<void>
 }
 
 function getWeekOfMonth(dateStr: string, year: number, month: number) {
@@ -82,7 +86,175 @@ function CategoryBadge({
   )
 }
 
-export default function Dashboard({ transactions, year, month, customCats, onCategoryChange }: Props) {
+function WidgetEditor({
+  initial, allCats, onSave, onCancel, saving,
+}: {
+  initial: CategoryWidget
+  allCats: string[]
+  onSave: (data: Omit<CategoryWidget, 'id'> & { id?: string }) => Promise<void>
+  onCancel: () => void
+  saving: boolean
+}) {
+  const [name, setName] = useState(initial.name)
+  const [emoji, setEmoji] = useState(initial.emoji)
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set(initial.categories))
+
+  function toggleCat(cat: string) {
+    setSelectedCats(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+  }
+
+  async function handleSave() {
+    if (!name.trim() || selectedCats.size === 0) return
+    await onSave({
+      id: initial.id,
+      name: name.trim(),
+      emoji,
+      categories: allCats.filter(c => selectedCats.has(c)),
+      sort_order: initial.sort_order,
+    })
+  }
+
+  return (
+    <div className="glass rounded-2xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-white">위젯 편집</p>
+        <button onClick={onCancel} className="text-white/40 hover:text-white/70 text-xl leading-none">×</button>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          value={emoji}
+          onChange={e => setEmoji(e.target.value)}
+          className="w-12 text-center glass-sm rounded-xl py-2 text-lg bg-transparent outline-none"
+          maxLength={2}
+        />
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="위젯 이름"
+          className="flex-1 glass-sm rounded-xl px-3 py-2 text-sm text-white bg-transparent outline-none placeholder-white/30"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {QUICK_EMOJIS.map(e => (
+          <button
+            key={e}
+            onClick={() => setEmoji(e)}
+            className={`w-8 h-8 rounded-lg text-base transition-all ${emoji === e ? 'glass-sm ring-1 ring-white/25' : 'hover:glass-sm'}`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>포함할 카테고리</p>
+        <div className="flex flex-wrap gap-1.5">
+          {allCats.map(cat => {
+            const selected = selectedCats.has(cat)
+            return (
+              <button
+                key={cat}
+                onClick={() => toggleCat(cat)}
+                className={`text-xs px-2.5 py-1 rounded-full transition-all font-medium ${
+                  selected
+                    ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-400/30'
+                    : 'glass-sm text-white/45 hover:text-white/70'
+                }`}
+              >
+                {cat}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim() || selectedCats.size === 0}
+          className="flex-1 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
+          style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+        >
+          {saving ? '저장 중...' : '저장'}
+        </button>
+        <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm glass-sm" style={{ color: 'var(--text-muted)' }}>
+          취소
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function WidgetCard({
+  widget, expenses, customCats, onEdit, onDelete,
+}: {
+  widget: CategoryWidget
+  expenses: Transaction[]
+  customCats?: CustomCat[]
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const catAmts: Record<string, number> = {}
+  for (const t of expenses) {
+    if (widget.categories.includes(t.category)) {
+      catAmts[t.category] = (catAmts[t.category] ?? 0) + t.amount
+    }
+  }
+  const total = widget.categories.reduce((s, c) => s + (catAmts[c] ?? 0), 0)
+  if (total === 0) return null
+
+  function catColor(name: string) {
+    const key = customCats?.find(c => c.name === name)?.color
+    return getCategoryColor(name, key)
+  }
+
+  const cols = widget.categories.length <= 1 ? 'grid grid-cols-1'
+    : widget.categories.length === 2 ? 'grid grid-cols-2'
+    : 'grid grid-cols-3'
+
+  return (
+    <div className="glass rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{widget.emoji}</span>
+          <p className="text-sm font-semibold text-white">{widget.name}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-orange-300">
+            {total > 0 ? `${total.toLocaleString('ko-KR')}원` : '-'}
+          </span>
+          <button onClick={onEdit} className="text-white/30 hover:text-white/70 text-sm transition-colors" title="편집">✎</button>
+          <button onClick={onDelete} className="text-white/30 hover:text-rose-400 text-base leading-none transition-colors" title="삭제">×</button>
+        </div>
+      </div>
+      <div className={`${cols} divide-x divide-white/5`}>
+        {widget.categories.map(cat => {
+          const amt = catAmts[cat] ?? 0
+          const cc = catColor(cat)
+          const pct = total > 0 ? Math.round((amt / total) * 100) : 0
+          return (
+            <div key={cat} className={`px-3 py-3 text-center ${amt === 0 ? 'opacity-30' : ''}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cc.bg} ${cc.text}`}>{cat}</span>
+              <p className="text-sm font-bold text-white mt-2">{amt > 0 ? amt.toLocaleString('ko-KR') : '-'}</p>
+              {amt > 0 && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{pct}%</p>}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default function Dashboard({ transactions, year, month, customCats, onCategoryChange, widgets, onWidgetSave, onWidgetDelete }: Props) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const expenses         = transactions.filter(t => t.type === 'expense')
   const fixedExpenses    = expenses.filter(t => t.is_recurring)
   const variableExpenses = expenses.filter(t => !t.is_recurring)
@@ -90,16 +262,6 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
   const variableTotal    = variableExpenses.reduce((s, t) => s + t.amount, 0)
   const totalExpense     = fixedTotal + variableTotal
   const fixedRatio       = totalExpense > 0 ? Math.round((fixedTotal / totalExpense) * 100) : 0
-
-  // 생활비(식비+카페+편의점) 블록
-  const livingMap: Record<string, number> = {}
-  for (const t of expenses) {
-    if (LIVING_CATS.includes(t.category as never)) {
-      livingMap[t.category] = (livingMap[t.category] ?? 0) + t.amount
-    }
-  }
-  const livingTotal = Object.values(livingMap).reduce((s, v) => s + v, 0)
-  const livingExists = Object.keys(livingMap).length > 0
 
   // 주별 지출
   const weeklyMap: Record<number, number> = {}
@@ -129,6 +291,21 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
     return getCategoryColor(name, key)
   }
 
+  async function handleWidgetSave(data: Omit<CategoryWidget, 'id'> & { id?: string }) {
+    setSaving(true)
+    try {
+      await onWidgetSave(data)
+      setEditingId(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const allCats = [
+    ...EXPENSE_CATEGORIES,
+    ...(customCats?.filter(c => c.type === 'expense').map(c => c.name) ?? []),
+  ]
+
   if (expenses.length === 0) {
     return (
       <div className="glass rounded-2xl py-16 text-center">
@@ -148,31 +325,27 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
   return (
     <div className="space-y-4">
 
-      {/* 생활비 블록 (task 7) */}
-      {livingExists && (
-        <div className="glass rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🍽</span>
-              <p className="text-sm font-semibold text-white">생활비</p>
-            </div>
-            <span className="text-sm font-bold text-orange-300">{livingTotal.toLocaleString('ko-KR')}원</span>
-          </div>
-          <div className="grid grid-cols-3 divide-x divide-white/5">
-            {(LIVING_CATS as readonly string[]).map(cat => {
-              const amt = livingMap[cat] ?? 0
-              const cc = catColor(cat)
-              const pct = livingTotal > 0 ? Math.round((amt / livingTotal) * 100) : 0
-              return (
-                <div key={cat} className={`px-3 py-3 text-center ${amt === 0 ? 'opacity-30' : ''}`}>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cc.bg} ${cc.text}`}>{cat}</span>
-                  <p className="text-sm font-bold text-white mt-2">{amt > 0 ? amt.toLocaleString('ko-KR') : '-'}</p>
-                  {amt > 0 && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{pct}%</p>}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      {/* 커스텀 위젯 */}
+      {widgets.map(widget =>
+        editingId === widget.id ? (
+          <WidgetEditor
+            key={widget.id}
+            initial={widget}
+            allCats={allCats}
+            onSave={handleWidgetSave}
+            onCancel={() => setEditingId(null)}
+            saving={saving}
+          />
+        ) : (
+          <WidgetCard
+            key={widget.id}
+            widget={widget}
+            expenses={expenses}
+            customCats={customCats}
+            onEdit={() => setEditingId(widget.id)}
+            onDelete={() => onWidgetDelete(widget.id)}
+          />
+        )
       )}
 
       {/* 고정 vs 변동 */}
