@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { Transaction } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import { getCategoryComment } from '@/lib/insights'
@@ -16,6 +17,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
   주거: '🏠', 의료: '💊', 문화: '🎬', 교육: '📚', 급여: '💰', 투자: '📈',
   부업: '💼', 보험: '🛡', 적금: '🏦', 기부금: '🤝', 카드대금: '💳', 기타: '📦',
 }
+
+const ORDER_KEY = 'fintrack-category-order'
 
 export default function CategoryBreakdown({ transactions, prevTransactions, customCats }: Props) {
   const expenses     = transactions.filter(t => t.type === 'expense')
@@ -34,7 +37,59 @@ export default function CategoryBreakdown({ transactions, prevTransactions, cust
     return acc
   }, {})
 
-  const sorted = Object.entries(byCategory).sort((a, b) => b[1].amount - a[1].amount)
+  const defaultSorted = Object.entries(byCategory).sort((a, b) => b[1].amount - a[1].amount)
+
+  const [order, setOrder] = useState<string[]>([])
+  const draggedCat = useRef<string | null>(null)
+  const dragOverCat = useRef<string | null>(null)
+
+  // 저장된 순서 불러오기 (현재 달 카테고리에 맞게 보정)
+  useEffect(() => {
+    const saved = localStorage.getItem(ORDER_KEY)
+    const currentCats = defaultSorted.map(([c]) => c)
+    if (saved) {
+      const parsed: string[] = JSON.parse(saved)
+      const restored = [
+        ...parsed.filter(c => currentCats.includes(c)),
+        ...currentCats.filter(c => !parsed.includes(c)),
+      ]
+      setOrder(restored)
+    } else {
+      setOrder(currentCats)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expenses.length])
+
+  const sorted: [string, { amount: number; count: number }][] =
+    order.length > 0
+      ? [
+          ...order.filter(c => byCategory[c]).map(c => [c, byCategory[c]] as [string, { amount: number; count: number }]),
+          ...defaultSorted.filter(([c]) => !order.includes(c)),
+        ]
+      : defaultSorted
+
+  function handleDragStart(cat: string) {
+    draggedCat.current = cat
+  }
+
+  function handleDragOver(e: React.DragEvent, cat: string) {
+    e.preventDefault()
+    dragOverCat.current = cat
+  }
+
+  function handleDrop() {
+    if (!draggedCat.current || !dragOverCat.current || draggedCat.current === dragOverCat.current) return
+    const next = [...order]
+    const fromIdx = next.indexOf(draggedCat.current)
+    const toIdx   = next.indexOf(dragOverCat.current)
+    if (fromIdx === -1 || toIdx === -1) return
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, draggedCat.current)
+    setOrder(next)
+    localStorage.setItem(ORDER_KEY, JSON.stringify(next))
+    draggedCat.current = null
+    dragOverCat.current = null
+  }
 
   if (sorted.length === 0) {
     return (
@@ -44,6 +99,8 @@ export default function CategoryBreakdown({ transactions, prevTransactions, cust
       </div>
     )
   }
+
+  const topCat = defaultSorted[0]?.[0]
 
   return (
     <div className="space-y-3">
@@ -59,19 +116,32 @@ export default function CategoryBreakdown({ transactions, prevTransactions, cust
       </div>
 
       {/* Category cards */}
-      {sorted.map(([category, { amount, count }], idx) => {
+      {sorted.map(([category, { amount, count }]) => {
         const pct       = total > 0 ? (amount / total) * 100 : 0
         const prevAmt   = prevByCategory[category]
         const changePct = prevAmt ? ((amount - prevAmt) / prevAmt) * 100 : null
         const colorKey  = customCats?.find(c => c.name === category)?.color
         const color     = getCategoryColor(category, colorKey)
         const comment   = getCategoryComment(category, pct, changePct)
-        const isTop     = idx === 0
+        const isTop     = category === topCat
 
         return (
-          <div key={category} className={`glass rounded-2xl px-4 py-4 transition-all ${isTop ? 'glow-rose' : ''}`}>
+          <div
+            key={category}
+            draggable
+            onDragStart={() => handleDragStart(category)}
+            onDragOver={e => handleDragOver(e, category)}
+            onDrop={handleDrop}
+            className={`glass rounded-2xl px-4 py-4 transition-all cursor-grab active:cursor-grabbing active:opacity-60 active:scale-[0.98] ${isTop ? 'glow-rose' : ''}`}
+          >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
+                {/* 드래그 핸들 */}
+                <div className="flex flex-col gap-0.5 shrink-0 opacity-25 hover:opacity-60 transition-opacity pt-1 cursor-grab">
+                  <span className="block w-3.5 h-px rounded-full bg-white" />
+                  <span className="block w-3.5 h-px rounded-full bg-white" />
+                  <span className="block w-3.5 h-px rounded-full bg-white" />
+                </div>
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${color.bg} shrink-0`}>
                   {CATEGORY_EMOJI[category] ?? '📦'}
                 </div>
