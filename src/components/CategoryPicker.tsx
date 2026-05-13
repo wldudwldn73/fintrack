@@ -278,18 +278,18 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
 
       {/* 새 카테고리 색상 선택 */}
       {showAdd && (
-        <div className="flex flex-wrap gap-2 px-0.5 py-0.5">
+        <div className="flex flex-wrap gap-3 px-1 py-1">
           {COLOR_OPTIONS.map(opt => (
             <button
               key={opt.key}
               type="button"
               onClick={() => setNewColor(opt.key)}
-              className={`w-5 h-5 rounded-full transition-all ${
+              style={{ backgroundColor: opt.dot, touchAction: 'manipulation' }}
+              className={`w-8 h-8 rounded-full transition-all active:scale-90 ${
                 newColor === opt.key
-                  ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-black/30 scale-110'
-                  : 'opacity-55 hover:opacity-90'
+                  ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/40 scale-110'
+                  : 'opacity-60 hover:opacity-100'
               }`}
-              style={{ backgroundColor: opt.dot }}
             />
           ))}
         </div>
@@ -297,7 +297,7 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
 
       {/* 기본 카테고리 색상 변경 */}
       {defaultColorEditName && !showAdd && (
-        <div className="flex flex-wrap gap-2 px-0.5 py-0.5">
+        <div className="flex flex-wrap gap-3 px-1 py-1">
           {COLOR_OPTIONS.map(opt => {
             const current = defaultOverrides[defaultColorEditName]
             return (
@@ -305,12 +305,12 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
                 key={opt.key}
                 type="button"
                 onClick={() => handleDefaultColorChange(defaultColorEditName, opt.key)}
-                className={`w-5 h-5 rounded-full transition-all ${
+                style={{ backgroundColor: opt.dot, touchAction: 'manipulation' }}
+                className={`w-8 h-8 rounded-full transition-all active:scale-90 ${
                   current === opt.key
-                    ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-black/30 scale-110'
-                    : 'opacity-55 hover:opacity-90'
+                    ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/40 scale-110'
+                    : 'opacity-60 hover:opacity-100'
                 }`}
-                style={{ backgroundColor: opt.dot }}
               />
             )
           })}
@@ -319,7 +319,7 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
 
       {/* 커스텀 카테고리 색상 변경 */}
       {colorEditId && !showAdd && !defaultColorEditName && (
-        <div className="flex flex-wrap gap-2 px-0.5 py-0.5">
+        <div className="flex flex-wrap gap-3 px-1 py-1">
           {COLOR_OPTIONS.map(opt => {
             const current = userCats.find(c => c.id === colorEditId)?.color
             return (
@@ -327,12 +327,12 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
                 key={opt.key}
                 type="button"
                 onClick={() => handleColorChange(colorEditId, opt.key)}
-                className={`w-5 h-5 rounded-full transition-all ${
+                style={{ backgroundColor: opt.dot, touchAction: 'manipulation' }}
+                className={`w-8 h-8 rounded-full transition-all active:scale-90 ${
                   current === opt.key
-                    ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-black/30 scale-110'
-                    : 'opacity-55 hover:opacity-90'
+                    ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/40 scale-110'
+                    : 'opacity-60 hover:opacity-100'
                 }`}
-                style={{ backgroundColor: opt.dot }}
               />
             )
           })}
