@@ -55,7 +55,7 @@ export default function SettingsModal({ widgets, customCats, onWidgetSave, onWid
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}>
       <div
         className="absolute inset-0"
         onClick={onClose}
