@@ -23,8 +23,13 @@ const CAT_COLORS: Record<string, string> = {
   문화: '#818cf8', 교육: '#c084fc', 보험: '#f472b6', 기타: '#94a3b8',
 }
 
-function catColor(cat: string) {
-  return CAT_COLORS[cat] ?? '#94a3b8'
+const FALLBACK_COLORS = [
+  '#f87171','#fb923c','#fbbf24','#a3e635','#34d399','#22d3ee',
+  '#818cf8','#c084fc','#f472b6','#94a3b8','#38bdf8','#4ade80',
+]
+
+function catColor(cat: string, idx: number) {
+  return CAT_COLORS[cat] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length]
 }
 
 function fmtAmount(n: number) {
@@ -32,6 +37,59 @@ function fmtAmount(n: number) {
   if (n >= 10_000_000) return `${(n / 10_000_000).toFixed(1)}천만원`
   if (n >= 10_000) return `${Math.round(n / 10_000)}만원`
   return `${n.toLocaleString()}원`
+}
+
+const R = 56
+const CX = 80
+const CY = 80
+const CIRCUMFERENCE = 2 * Math.PI * R
+const GAP = 2
+
+function DonutChart({ rows, total, centerLabel }: { rows: CatRow[]; total: number; centerLabel: string }) {
+  if (total === 0 || rows.length === 0) {
+    return (
+      <svg width={160} height={160} viewBox="0 0 160 160">
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={18} />
+        <text x={CX} y={CY - 6} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.3)">내역</text>
+        <text x={CX} y={CY + 10} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.3)">없음</text>
+      </svg>
+    )
+  }
+
+  const segments: { color: string; dash: number; offset: number; cat: string }[] = []
+  let cumulative = 0
+  rows.forEach((row, i) => {
+    const portion = (row.amount / total) * (CIRCUMFERENCE - GAP * rows.length)
+    const offset = CIRCUMFERENCE - cumulative
+    segments.push({ color: catColor(row.category, i), dash: portion, offset, cat: row.category })
+    cumulative += portion + GAP
+  })
+
+  return (
+    <svg width={160} height={160} viewBox="0 0 160 160">
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={18} />
+      {segments.map((seg, i) => (
+        <circle
+          key={i}
+          cx={CX}
+          cy={CY}
+          r={R}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth={18}
+          strokeDasharray={`${seg.dash} ${CIRCUMFERENCE - seg.dash}`}
+          strokeDashoffset={seg.offset}
+          strokeLinecap="butt"
+          transform={`rotate(-90 ${CX} ${CY})`}
+          opacity={0.9}
+        />
+      ))}
+      <text x={CX} y={CY - 7} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.45)">{centerLabel}</text>
+      <text x={CX} y={CY + 8} textAnchor="middle" fontSize="13" fontWeight="bold" fill="white">
+        {fmtAmount(total)}
+      </text>
+    </svg>
+  )
 }
 
 export default function MonthlyTrendChart() {
@@ -68,24 +126,25 @@ export default function MonthlyTrendChart() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="glass rounded-2xl h-52 shimmer" />
+  if (loading) return <div className="glass rounded-2xl h-64 shimmer" />
   if (!summary) return null
 
   const rows = tab === 'income' ? summary.income : summary.expense
   const total = tab === 'income' ? summary.totalIncome : summary.totalExpense
-  const max = rows[0]?.amount ?? 1
   const net = summary.totalIncome - summary.totalExpense
 
   return (
-    <div className="glass rounded-2xl px-4 pt-4 pb-4 space-y-4">
+    <div className="glass rounded-2xl px-4 pt-4 pb-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>전체 수입·지출 분석</span>
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+        <span
+          className="text-xs font-medium px-2 py-0.5 rounded-full"
           style={{
             background: net >= 0 ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)',
             color: net >= 0 ? '#34d399' : '#f87171',
-          }}>
+          }}
+        >
           {net >= 0 ? '+' : ''}{fmtAmount(net)}
         </span>
       </div>
@@ -114,42 +173,42 @@ export default function MonthlyTrendChart() {
         </button>
       </div>
 
-      {/* Category rows */}
-      {rows.length === 0 ? (
-        <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>내역 없음</p>
-      ) : (
-        <div className="space-y-2.5">
-          {rows.map(row => {
-            const pct = (row.amount / max) * 100
-            const color = catColor(row.category)
-            return (
-              <div key={row.category} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                    <span style={{ color: 'var(--text-secondary)' }}>{row.category}</span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{row.count}건</span>
-                  </div>
-                  <span className="font-semibold tabular-nums" style={{ color }}>
-                    {fmtAmount(row.amount)}
-                  </span>
-                </div>
-                {/* bar */}
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, background: color, opacity: 0.8 }}
-                  />
-                </div>
-                {/* share */}
-                <p className="text-right text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {total > 0 ? ((row.amount / total) * 100).toFixed(1) : '0'}%
-                </p>
-              </div>
-            )
-          })}
+      {/* Donut + Legend */}
+      <div className="flex items-start gap-3">
+        <div className="shrink-0">
+          <DonutChart
+            rows={rows}
+            total={total}
+            centerLabel={tab === 'expense' ? '총 지출' : '총 수입'}
+          />
         </div>
-      )}
+
+        {/* Legend */}
+        <div className="flex-1 space-y-2 pt-2 min-w-0">
+          {rows.length === 0 ? (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>내역 없음</p>
+          ) : (
+            rows.map((row, i) => {
+              const color = catColor(row.category, i)
+              const pct = total > 0 ? ((row.amount / total) * 100).toFixed(1) : '0'
+              return (
+                <div key={row.category} className="space-y-0.5">
+                  <div className="flex items-center justify-between gap-1 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                      <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{row.category}</span>
+                    </div>
+                    <span className="text-xs font-semibold tabular-nums shrink-0" style={{ color }}>{pct}%</span>
+                  </div>
+                  <p className="text-[10px] pl-3.5 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    {fmtAmount(row.amount)} · {row.count}건
+                  </p>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
     </div>
   )
 }
