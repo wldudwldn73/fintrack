@@ -194,7 +194,7 @@ function w(n: number) {
   return Math.round(n).toLocaleString('ko-KR') + '원'
 }
 
-interface DonutSlice { category: string; amount: number; color: string; pct: number }
+interface DonutSlice { category: string; amount: number; count: number; color: string; pct: number }
 
 function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) {
   const SIZE = 76, CX = 38, CY = 38, R = 26, SW = 11
@@ -238,7 +238,10 @@ function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) 
           <div key={s.category} className="flex items-center gap-1.5 min-w-0">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
             <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{s.category}</span>
-            <span className="text-[10px] font-semibold text-white/70 ml-auto shrink-0">{Math.round(s.pct * 100)}%</span>
+            <div className="flex items-center gap-1 ml-auto shrink-0">
+              <span className="text-[10px] font-semibold text-white/70">{Math.round(s.pct * 100)}%</span>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.count}건</span>
+            </div>
           </div>
         ))}
       </div>
@@ -367,15 +370,19 @@ export default function CalendarTab({
   const donutSlices = useMemo(() => {
     const expense = selectedTxs.filter(t => t.type === 'expense' && !t.is_excluded)
     if (expense.length === 0) return []
-    const catMap: Record<string, number> = {}
-    for (const t of expense) catMap[t.category] = (catMap[t.category] ?? 0) + t.amount
-    const total = Object.values(catMap).reduce((s, v) => s + v, 0)
+    const catMap: Record<string, { amount: number; count: number }> = {}
+    for (const t of expense) {
+      if (!catMap[t.category]) catMap[t.category] = { amount: 0, count: 0 }
+      catMap[t.category].amount += t.amount
+      catMap[t.category].count += 1
+    }
+    const total = Object.values(catMap).reduce((s, v) => s + v.amount, 0)
     const customColorMap = Object.fromEntries(customCats.map(c => [c.name, c.color]))
     return Object.entries(catMap)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].amount - a[1].amount)
       .slice(0, 5)
-      .map(([category, amount]) => ({
-        category, amount,
+      .map(([category, { amount, count }]) => ({
+        category, amount, count,
         color: getCategoryColor(category, customColorMap[category]).dot,
         pct: amount / total,
       }))
