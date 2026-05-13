@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('custom_categories')
-    .insert({ user_id: user.id, name: name.trim(), type, color })
+    .upsert(
+      { user_id: user.id, name: name.trim(), type, color },
+      { onConflict: 'user_id,name,type', ignoreDuplicates: false },
+    )
     .select('id, name, type, color')
     .single()
 

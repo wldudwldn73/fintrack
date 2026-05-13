@@ -16,7 +16,8 @@ import CalendarTab from '@/components/CalendarTab'
 import LearnedCategoriesModal from '@/components/LearnedCategoriesModal'
 import CoachModal from '@/components/CoachModal'
 import { Transaction, TransactionInsert, Budget } from '@/lib/types'
-import { getTransactions, addTransaction, addTransactions, deleteTransaction, updateTransactionType } from '@/lib/transactions'
+import { getTransactions, addTransaction, addTransactions, deleteTransaction, updateTransactionType, updateTransactionAmount } from '@/lib/transactions'
+import { type CustomCat } from '@/components/CategoryPicker'
 import IncomeCandidateBanner, { INCOME_KEYWORDS, loadDismissed, saveDismissed } from '@/components/IncomeCandidateBanner'
 import { getBudgets } from '@/lib/budget'
 import { generateInsights } from '@/lib/insights'
@@ -38,6 +39,7 @@ export default function Home() {
   const [showCoach, setShowCoach] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
+  const [customCats, setCustomCats] = useState<CustomCat[]>([])
   const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(new Set())
   const [dismissedSupport, setDismissedSupport] = useState<Set<string>>(new Set())
   const [supportItems, setSupportItems] = useState<SupportItem[]>([])

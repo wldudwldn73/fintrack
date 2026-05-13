@@ -103,6 +103,11 @@ export async function updateTransactionType(id: string, type: string, category: 
   if (error) throw error
 }
 
+export async function updateTransactionAmount(id: string, amount: number): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ amount }).eq('id', id)
+  if (error) throw error
+}
+
 export async function updateTransactionHidden(id: string, is_hidden: boolean): Promise<void> {
   const { error } = await supabase.from('transactions').update({ is_hidden }).eq('id', id)
   if (error) throw error
