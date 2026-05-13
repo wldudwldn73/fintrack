@@ -119,7 +119,9 @@ export async function POST(req: NextRequest) {
 ${txSummary}
 
 간결하고 친근하게 한국어로 답변하세요. 금액은 원 단위로 표시하세요.
-수정/삭제 요청은 반드시 도구를 사용해 직접 처리한 후 결과를 알려주세요.`
+추가·수정·삭제 요청은 반드시 도구를 사용해 직접 처리한 후 결과를 알려주세요.
+수입(급여, 부업, 투자수익 등)과 지출 모두 add_transaction 도구로 추가할 수 있습니다.
+"넣어줘", "추가해줘", "기록해줘" 같은 요청도 모두 add_transaction을 사용하세요.`
 
   const messages: Groq.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
