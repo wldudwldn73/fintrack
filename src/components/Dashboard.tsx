@@ -4,11 +4,15 @@ import { useState } from 'react'
 import { Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import { updateTransactionCategory } from '@/lib/transactions'
+import { type CustomCat } from '@/components/CategoryPicker'
+
+const LIVING_CATS = ['식비', '카페', '편의점'] as const
 
 interface Props {
   transactions: Transaction[]
   year: number
   month: number
+  customCats?: CustomCat[]
   onCategoryChange: (id: string, category: string) => void
 }
 
@@ -30,16 +34,21 @@ function getWeekLabel(week: number, year: number, month: number) {
   return `${week}주 (${fmt(start)}~${fmt(end)})`
 }
 
-function CategoryBadge({ tx, onCategoryChange }: { tx: Transaction; onCategoryChange: (id: string, cat: string) => void }) {
+function CategoryBadge({
+  tx, customCats, onCategoryChange,
+}: { tx: Transaction; customCats?: CustomCat[]; onCategoryChange: (id: string, cat: string) => void }) {
   const [editing, setEditing] = useState(false)
-  const colors = getCategoryColor(tx.category)
-  const cats   = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const colorKey = customCats?.find(c => c.name === tx.category)?.color
+  const colors = getCategoryColor(tx.category, colorKey)
+  const cats = tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const userCats = customCats?.filter(c => c.type === tx.type && !cats.includes(c.name as never)) ?? []
 
   if (editing) {
     return (
       <div className="flex flex-wrap gap-1 mt-1" onClick={e => e.stopPropagation()}>
-        {cats.map(c => {
-          const cc = getCategoryColor(c)
+        {[...cats, ...userCats.map(c => c.name)].map(c => {
+          const ck = customCats?.find(cc => cc.name === c)?.color
+          const cc = getCategoryColor(c, ck)
           return (
             <button
               key={c}
@@ -73,7 +82,7 @@ function CategoryBadge({ tx, onCategoryChange }: { tx: Transaction; onCategoryCh
   )
 }
 
-export default function Dashboard({ transactions, year, month, onCategoryChange }: Props) {
+export default function Dashboard({ transactions, year, month, customCats, onCategoryChange }: Props) {
   const expenses         = transactions.filter(t => t.type === 'expense')
   const fixedExpenses    = expenses.filter(t => t.is_recurring)
   const variableExpenses = expenses.filter(t => !t.is_recurring)
@@ -81,6 +90,16 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
   const variableTotal    = variableExpenses.reduce((s, t) => s + t.amount, 0)
   const totalExpense     = fixedTotal + variableTotal
   const fixedRatio       = totalExpense > 0 ? Math.round((fixedTotal / totalExpense) * 100) : 0
+
+  // 생활비(식비+카페+편의점) 블록
+  const livingMap: Record<string, number> = {}
+  for (const t of expenses) {
+    if (LIVING_CATS.includes(t.category as never)) {
+      livingMap[t.category] = (livingMap[t.category] ?? 0) + t.amount
+    }
+  }
+  const livingTotal = Object.values(livingMap).reduce((s, v) => s + v, 0)
+  const livingExists = Object.keys(livingMap).length > 0
 
   // 주별 지출
   const weeklyMap: Record<number, number> = {}
@@ -91,7 +110,6 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
   const weeks     = Object.entries(weeklyMap).map(([w, amt]) => ({ week: Number(w), amount: amt })).sort((a, b) => a.week - b.week)
   const maxWeekly = Math.max(...weeks.map(w => w.amount), 1)
 
-  // 결제수단 × 기관별 그룹
   type MethodGroup = { key: string; payment_method: string; institution: string | null; total: number; txs: Transaction[] }
   const methodMap: Record<string, MethodGroup> = {}
   for (const t of expenses) {
@@ -105,6 +123,11 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
   const methods = Object.values(methodMap).sort((a, b) => b.total - a.total).map(m => ({
     ...m, txs: m.txs.sort((a, b) => b.amount - a.amount),
   }))
+
+  function catColor(name: string) {
+    const key = customCats?.find(c => c.name === name)?.color
+    return getCategoryColor(name, key)
+  }
 
   if (expenses.length === 0) {
     return (
@@ -124,6 +147,34 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
 
   return (
     <div className="space-y-4">
+
+      {/* 생활비 블록 (task 7) */}
+      {livingExists && (
+        <div className="glass rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🍽</span>
+              <p className="text-sm font-semibold text-white">생활비</p>
+            </div>
+            <span className="text-sm font-bold text-orange-300">{livingTotal.toLocaleString('ko-KR')}원</span>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-white/5">
+            {(LIVING_CATS as readonly string[]).map(cat => {
+              const amt = livingMap[cat] ?? 0
+              const cc = catColor(cat)
+              const pct = livingTotal > 0 ? Math.round((amt / livingTotal) * 100) : 0
+              return (
+                <div key={cat} className={`px-3 py-3 text-center ${amt === 0 ? 'opacity-30' : ''}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cc.bg} ${cc.text}`}>{cat}</span>
+                  <p className="text-sm font-bold text-white mt-2">{amt > 0 ? amt.toLocaleString('ko-KR') : '-'}</p>
+                  {amt > 0 && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{pct}%</p>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 고정 vs 변동 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="glass rounded-2xl px-4 py-4 glow-amber relative overflow-hidden">
@@ -164,7 +215,7 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
           </div>
           <div className="divide-y divide-white/5">
             {fixedExpenses.sort((a, b) => b.amount - a.amount).map(tx => {
-              const cc = getCategoryColor(tx.category)
+              const cc = catColor(tx.category)
               return (
                 <div key={tx.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-2 min-w-0">
@@ -234,7 +285,7 @@ export default function Dashboard({ transactions, year, month, onCategoryChange 
                   <div key={tx.id} className="px-4 py-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0">
-                        <CategoryBadge tx={tx} onCategoryChange={onCategoryChange} />
+                        <CategoryBadge tx={tx} customCats={customCats} onCategoryChange={onCategoryChange} />
                         {tx.is_recurring && (
                           <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
                         )}

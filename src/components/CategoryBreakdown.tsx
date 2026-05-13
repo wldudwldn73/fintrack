@@ -3,10 +3,12 @@
 import { Transaction } from '@/lib/types'
 import { getCategoryColor } from '@/lib/categoryColors'
 import { getCategoryComment } from '@/lib/insights'
+import { type CustomCat } from '@/components/CategoryPicker'
 
 interface Props {
   transactions: Transaction[]
   prevTransactions: Transaction[]
+  customCats?: CustomCat[]
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -15,7 +17,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   부업: '💼', 보험: '🛡', 적금: '🏦', 기부금: '🤝', 카드대금: '💳', 기타: '📦',
 }
 
-export default function CategoryBreakdown({ transactions, prevTransactions }: Props) {
+export default function CategoryBreakdown({ transactions, prevTransactions, customCats }: Props) {
   const expenses     = transactions.filter(t => t.type === 'expense')
   const prevExpenses = prevTransactions.filter(t => t.type === 'expense')
   const total        = expenses.reduce((s, t) => s + t.amount, 0)
@@ -61,7 +63,8 @@ export default function CategoryBreakdown({ transactions, prevTransactions }: Pr
         const pct       = total > 0 ? (amount / total) * 100 : 0
         const prevAmt   = prevByCategory[category]
         const changePct = prevAmt ? ((amount - prevAmt) / prevAmt) * 100 : null
-        const color     = getCategoryColor(category)
+        const colorKey  = customCats?.find(c => c.name === category)?.color
+        const color     = getCategoryColor(category, colorKey)
         const comment   = getCategoryComment(category, pct, changePct)
         const isTop     = idx === 0
 

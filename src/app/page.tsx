@@ -46,6 +46,12 @@ export default function Home() {
 
   useEffect(() => { setDismissedIncome(loadDismissed()) }, [])
   useEffect(() => { setDismissedSupport(loadDismissedSupport()) }, [])
+  useEffect(() => {
+    fetch('/api/custom-categories')
+      .then(r => r.json())
+      .then((d: CustomCat[]) => setCustomCats(Array.isArray(d) ? d : []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
@@ -138,6 +144,10 @@ export default function Home() {
 
   function handleHiddenChange(id: string, is_hidden: boolean) {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, is_hidden } : t))
+  }
+
+  function handleAmountChange(id: string, amount: number) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, amount } : t))
   }
 
   async function handleIncomeConfirm(id: string, category: string) {
@@ -342,6 +352,8 @@ export default function Home() {
               transactions={transactions}
               year={year}
               month={month}
+              customCats={customCats}
+              onCatsChange={setCustomCats}
               onDelete={handleDelete}
               onCategoryChange={handleCategoryChange}
               onBulkCategoryChange={handleBulkCategoryChange}
@@ -349,13 +361,14 @@ export default function Home() {
               onExcludedChange={handleExcludedChange}
               onBulkExcludedChange={handleBulkExcludedChange}
               onMetaChange={handleMetaChange}
+              onAmountChange={handleAmountChange}
               onSortOrderChange={handleSortOrderChange}
               onHiddenChange={handleHiddenChange}
             />
           </div>
         ) : tab === 'category' ? (
           <div className="anim-up-4">
-            <CategoryBreakdown transactions={activeTransactions} prevTransactions={prevTransactions.filter(t => !t.is_excluded)} />
+            <CategoryBreakdown transactions={activeTransactions} prevTransactions={prevTransactions.filter(t => !t.is_excluded)} customCats={customCats} />
           </div>
         ) : (
           <div className="anim-up-4 space-y-4">
@@ -370,6 +383,7 @@ export default function Home() {
               transactions={activeTransactions}
               year={year}
               month={month}
+              customCats={customCats}
               onCategoryChange={handleCategoryChange}
             />
           </div>

@@ -21,16 +21,36 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
   const [newColor, setNewColor] = useState('zinc')
   const [adding, setAdding] = useState(false)
   const [colorEditId, setColorEditId] = useState<string | null>(null)
+  const [defaultColorEditName, setDefaultColorEditName] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const isControlled = externalCats !== undefined
   const allCats: CustomCat[] = isControlled ? externalCats! : internalCats
-  const userCats = allCats.filter(c => c.type === type)
   const defaultCats = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
+
+  // 기본 카테고리 색상 오버라이드 (이름이 기본 카테고리와 겹치는 커스텀 항목)
+  const defaultOverrides = Object.fromEntries(
+    allCats
+      .filter(c => defaultCats.includes(c.name as never))
+      .map(c => [c.name, c.color])
+  )
+
+  // 실제 커스텀 카테고리만 (기본 카테고리 이름과 다른 것)
+  const userCats = allCats.filter(c => c.type === type && !defaultCats.includes(c.name as never))
+
+  // 현재 사용 중인 색상 목록
+  const usedColors = new Set(allCats.map(c => c.color))
 
   function updateCats(next: CustomCat[]) {
     if (isControlled) onCatsChange?.(next)
     else setInternalCats(next)
+  }
+
+  // 충돌 없는 색상 자동 선택
+  function pickUnusedColor(exclude?: string): string {
+    const used = new Set([...usedColors, exclude].filter(Boolean))
+    const free = COLOR_OPTIONS.find(o => !used.has(o.key))
+    return free?.key ?? COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)].key
   }
 
   useEffect(() => {
@@ -46,6 +66,12 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
     if (showAdd) setTimeout(() => inputRef.current?.focus(), 50)
   }, [showAdd])
 
+  // 새 카테고리 추가 시 초기 색상 = 충돌 없는 색상
+  useEffect(() => {
+    if (showAdd) setNewColor(pickUnusedColor())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAdd])
+
   async function handleAdd() {
     const name = newName.trim()
     if (!name) return
@@ -56,12 +82,14 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
       setShowAdd(false)
       return
     }
+    // 색상 충돌 시 자동 변경
+    const safeColor = usedColors.has(newColor) ? pickUnusedColor(newColor) : newColor
     setAdding(true)
     try {
       const res = await fetch('/api/custom-categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, type, color: newColor }),
+        body: JSON.stringify({ name, type, color: safeColor }),
       })
       const data = await res.json() as CustomCat
       if (data.id) {
@@ -83,13 +111,40 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
   }
 
   async function handleColorChange(id: string, color: string) {
-    updateCats(allCats.map(c => c.id === id ? { ...c, color } : c))
+    // 충돌 시 자동 변경
+    const currentOwner = allCats.find(c => c.id === id)
+    const safeColor = (usedColors.has(color) && currentOwner?.color !== color)
+      ? pickUnusedColor(color) : color
+    updateCats(allCats.map(c => c.id === id ? { ...c, color: safeColor } : c))
     setColorEditId(null)
     fetch('/api/custom-categories', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, color }),
+      body: JSON.stringify({ id, color: safeColor }),
     })
+  }
+
+  // 기본 카테고리 색상 오버라이드 저장 (task 3)
+  async function handleDefaultColorChange(catName: string, color: string) {
+    const safeColor = (() => {
+      const usedExcludingSelf = new Set(
+        allCats.filter(c => c.name !== catName).map(c => c.color)
+      )
+      return usedExcludingSelf.has(color) ? pickUnusedColor(color) : color
+    })()
+    setDefaultColorEditName(null)
+    const res = await fetch('/api/custom-categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: catName, type, color: safeColor }),
+    })
+    const data = await res.json() as CustomCat
+    if (data.id) {
+      // 기존 오버라이드가 있으면 교체, 없으면 추가
+      const exists = allCats.find(c => c.name === catName && defaultCats.includes(c.name as never))
+      if (exists) updateCats(allCats.map(c => c.id === exists.id ? { ...c, color: safeColor } : c))
+      else updateCats([...allCats, data])
+    }
   }
 
   const selectedDot = COLOR_OPTIONS.find(o => o.key === newColor)?.dot ?? '#9ca3af'
@@ -97,22 +152,41 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
-        {/* 기본 카테고리 */}
+        {/* 기본 카테고리 — 색상 점 클릭 시 오버라이드 가능 */}
         {defaultCats.map(c => {
-          const cc = getCategoryColor(c)
+          const colorKey = defaultOverrides[c]
+          const cc = getCategoryColor(c, colorKey)
+          const isEditingColor = defaultColorEditName === c
           return (
-            <button
+            <span
               key={c}
-              type="button"
-              onClick={() => { onChange(c); setColorEditId(null) }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                selected === c
-                  ? `${cc.bg} ${cc.text} ring-1 ring-white/15 scale-105`
-                  : 'glass-sm text-white/45 hover:text-white/70'
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                isEditingColor
+                  ? `${cc.bg} ${cc.text} ring-2 ring-white/25`
+                  : selected === c
+                    ? `${cc.bg} ${cc.text} ring-1 ring-white/15 scale-105`
+                    : 'glass-sm text-white/45'
               }`}
             >
-              {c}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDefaultColorEditName(isEditingColor ? null : c)
+                  setColorEditId(null)
+                  setShowAdd(false)
+                }}
+                className="w-2 h-2 rounded-full shrink-0 transition-transform hover:scale-125"
+                style={{ backgroundColor: cc.dot }}
+                title="색상 변경"
+              />
+              <button
+                type="button"
+                onClick={() => { onChange(c); setDefaultColorEditName(null) }}
+                className="hover:text-white/80 transition-colors"
+              >
+                {c}
+              </button>
+            </span>
           )
         })}
 
@@ -132,15 +206,13 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
                     : 'glass-sm text-white/45'
               }`}
             >
-              {/* 색상 점 — 클릭 시 색상 편집 */}
               <button
                 type="button"
-                onClick={() => { setColorEditId(isEditingColor ? null : c.id); setShowAdd(false) }}
+                onClick={() => { setColorEditId(isEditingColor ? null : c.id); setDefaultColorEditName(null); setShowAdd(false) }}
                 className="w-2 h-2 rounded-full shrink-0 transition-transform hover:scale-125"
                 style={{ backgroundColor: cc.dot }}
                 title="색상 변경"
               />
-              {/* 이름 — 클릭 시 선택 */}
               <button
                 type="button"
                 onClick={() => { onChange(c.name); setColorEditId(null) }}
@@ -148,7 +220,6 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
               >
                 {c.name}
               </button>
-              {/* 삭제 */}
               <button
                 type="button"
                 onClick={() => handleDelete(c.id, c.name)}
@@ -197,7 +268,7 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
         ) : (
           <button
             type="button"
-            onClick={() => { setShowAdd(true); setColorEditId(null) }}
+            onClick={() => { setShowAdd(true); setColorEditId(null); setDefaultColorEditName(null) }}
             className="px-3 py-1.5 rounded-full text-xs glass-sm text-white/35 hover:text-white/60 transition-all border border-white/10 border-dashed"
           >
             + 추가
@@ -224,8 +295,30 @@ export default function CategoryPicker({ type, selected, onChange, externalCats,
         </div>
       )}
 
-      {/* 기존 카테고리 색상 변경 */}
-      {colorEditId && !showAdd && (
+      {/* 기본 카테고리 색상 변경 */}
+      {defaultColorEditName && !showAdd && (
+        <div className="flex flex-wrap gap-2 px-0.5 py-0.5">
+          {COLOR_OPTIONS.map(opt => {
+            const current = defaultOverrides[defaultColorEditName]
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => handleDefaultColorChange(defaultColorEditName, opt.key)}
+                className={`w-5 h-5 rounded-full transition-all ${
+                  current === opt.key
+                    ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-black/30 scale-110'
+                    : 'opacity-55 hover:opacity-90'
+                }`}
+                style={{ backgroundColor: opt.dot }}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* 커스텀 카테고리 색상 변경 */}
+      {colorEditId && !showAdd && !defaultColorEditName && (
         <div className="flex flex-wrap gap-2 px-0.5 py-0.5">
           {COLOR_OPTIONS.map(opt => {
             const current = userCats.find(c => c.id === colorEditId)?.color

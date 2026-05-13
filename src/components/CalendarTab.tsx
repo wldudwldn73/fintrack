@@ -10,6 +10,7 @@ import {
   updateTransactionExcluded,
   updateTransactionHidden,
   updateTransactionMeta,
+  updateTransactionAmount,
   updateTransactionSortOrders,
   excludeTransactionsByKeyword,
   deleteTransaction,
@@ -26,7 +27,10 @@ interface Props {
   onRecurringChange: (id: string, is_recurring: boolean) => void
   onExcludedChange: (id: string, is_excluded: boolean) => void
   onBulkExcludedChange: (ids: string[]) => void
+  customCats: CustomCat[]
+  onCatsChange: (cats: CustomCat[]) => void
   onMetaChange: (id: string, description: string | null, memo: string | null) => void
+  onAmountChange: (id: string, amount: number) => void
   onSortOrderChange: (updates: { id: string; sort_order: number }[]) => void
   onHiddenChange: (id: string, is_hidden: boolean) => void
 }
@@ -257,7 +261,8 @@ function fmt(n: number) {
 
 export default function CalendarTab({
   transactions, year, month,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onSortOrderChange, onHiddenChange,
+  customCats, onCatsChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onAmountChange, onSortOrderChange, onHiddenChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -278,6 +283,7 @@ export default function CalendarTab({
     is_hidden: boolean
     description: string
     memo: string
+    amount: string
   } | null>(null)
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineEditValue, setInlineEditValue] = useState('')
@@ -289,7 +295,6 @@ export default function CalendarTab({
   const [saving, setSaving] = useState(false)
   const [storyCache, setStoryCache] = useState<Record<string, { situation?: string; pattern?: string; tip?: string } | null>>({})
   const [storyLoading, setStoryLoading] = useState(false)
-  const [customCats, setCustomCats] = useState<CustomCat[]>([])
 
   const bulkAnchorRef = useRef<HTMLDivElement>(null)
 
@@ -298,13 +303,6 @@ export default function CalendarTab({
       setTimeout(() => bulkAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 30)
     }
   }, [bulkPrompt])
-
-  useEffect(() => {
-    fetch('/api/custom-categories')
-      .then(r => r.json())
-      .then((data: CustomCat[]) => setCustomCats(Array.isArray(data) ? data : []))
-      .catch(() => {})
-  }, [])
 
   // 첫 진입 시 기본 선택 날짜 스토리 로드
   useEffect(() => {
@@ -439,6 +437,7 @@ export default function CalendarTab({
       is_hidden: tx.is_hidden,
       description: tx.description ?? '',
       memo: tx.memo ?? '',
+      amount: String(tx.amount),
     })
   }
 
@@ -474,6 +473,11 @@ export default function CalendarTab({
       if (editState.is_hidden !== tx.is_hidden) {
         promises.push(updateTransactionHidden(tx.id, editState.is_hidden))
         onHiddenChange(tx.id, editState.is_hidden)
+      }
+      const newAmount = Number(editState.amount)
+      if (!isNaN(newAmount) && newAmount > 0 && newAmount !== tx.amount) {
+        promises.push(updateTransactionAmount(tx.id, newAmount))
+        onAmountChange(tx.id, newAmount)
       }
       const newDesc = editState.description.trim() || null
       const newMemo = editState.memo.trim() || null
@@ -736,6 +740,7 @@ export default function CalendarTab({
                 || editState.is_hidden !== tx.is_hidden
                 || editState.description !== (tx.description ?? '')
                 || editState.memo !== (tx.memo ?? '')
+                || Number(editState.amount) !== tx.amount
               : false
 
             return (
@@ -762,6 +767,17 @@ export default function CalendarTab({
                 <div className="flex-1 min-w-0">
                 {isEditing && editState ? (
                   <div className="space-y-2.5">
+                    {/* 금액 편집 */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={editState.amount}
+                        onChange={e => setEditState(s => s ? { ...s, amount: e.target.value } : s)}
+                        placeholder="금액"
+                        className="flex-1 glass-sm rounded-xl px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                      />
+                      <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>원</span>
+                    </div>
                     {/* 내역 이름 편집 */}
                     <input
                       type="text"
@@ -783,7 +799,7 @@ export default function CalendarTab({
                       selected={editState.category}
                       onChange={c => setEditState(s => s ? { ...s, category: c } : s)}
                       externalCats={customCats}
-                      onCatsChange={setCustomCats}
+                      onCatsChange={onCatsChange}
                     />
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
@@ -818,16 +834,14 @@ export default function CalendarTab({
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      {hasChanged && (
-                        <button
-                          onClick={() => saveEdit(tx)}
-                          disabled={saving}
-                          className="text-xs px-3 py-1 rounded-full font-semibold transition-all disabled:opacity-50"
-                          style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white' }}
-                        >
-                          {saving ? '저장 중…' : '저장'}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => saveEdit(tx)}
+                        disabled={saving || !hasChanged}
+                        className="text-xs px-3 py-1 rounded-full font-semibold transition-all disabled:opacity-30"
+                        style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: 'white' }}
+                      >
+                        {saving ? '저장 중…' : '저장'}
+                      </button>
                       <button onClick={cancelEdit} className="text-xs px-2 py-0.5 rounded-full glass-sm text-rose-400">
                         취소
                       </button>
