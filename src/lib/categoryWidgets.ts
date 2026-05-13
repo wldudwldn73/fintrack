@@ -20,13 +20,27 @@ export async function getCategoryWidgets(): Promise<CategoryWidget[]> {
 }
 
 export async function upsertCategoryWidget(w: WidgetInput): Promise<CategoryWidget> {
-  const { data, error } = await supabase
-    .from('category_widgets')
-    .upsert(w)
-    .select('id, name, emoji, categories, sort_order')
-    .single()
-  if (error) throw error
-  return data
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('로그인이 필요합니다')
+
+  if (w.id) {
+    const { data, error } = await supabase
+      .from('category_widgets')
+      .update({ name: w.name, emoji: w.emoji, categories: w.categories, sort_order: w.sort_order })
+      .eq('id', w.id)
+      .select('id, name, emoji, categories, sort_order')
+      .single()
+    if (error) throw error
+    return data
+  } else {
+    const { data, error } = await supabase
+      .from('category_widgets')
+      .insert({ ...w, user_id: user.id })
+      .select('id, name, emoji, categories, sort_order')
+      .single()
+    if (error) throw error
+    return data
+  }
 }
 
 export async function deleteCategoryWidget(id: string): Promise<void> {
