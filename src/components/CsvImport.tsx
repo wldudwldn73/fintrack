@@ -1,27 +1,115 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import XLSXStyle from 'xlsx-js-style'
 import { parseTossFile, ParseResult } from '@/lib/parseTossFile'
 import { TransactionInsert, RECURRING_CATEGORIES, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/lib/types'
-import { getTransactionsByDateRange } from '@/lib/transactions'
+import { getTransactionsByDateRange, getAllTransactions } from '@/lib/transactions'
 import { getCategoryColor } from '@/lib/categoryColors'
+import { type CustomCat } from '@/components/CategoryPicker'
 
 interface Props {
   onImport: (transactions: TransactionInsert[]) => Promise<void>
   onClose: () => void
+  customCats?: CustomCat[]
 }
 
-export default function CsvImport({ onImport, onClose }: Props) {
+async function downloadAllTransactions() {
+  const all = await getAllTransactions()
+  if (all.length === 0) return
+
+  const HEADER_BG  = '312E81'  // indigo-950
+  const HEADER_FG  = 'FFFFFF'
+  const ROW_EVEN   = 'EEF2FF'  // indigo-50
+  const INCOME_FG  = '0E7490'  // cyan-700
+  const EXPENSE_FG = 'BE123C'  // rose-700
+  const BORDER     = { style: 'thin' as const, color: { rgb: 'C7D2FE' } }
+  const COLS = ['날짜', '거래내용', '출금금액', '입금금액', '카테고리', '메모', '결제수단', '고정지출']
+  const COL_KEYS   = 'ABCDEFGH'.split('')
+  const COL_WIDTHS = [12, 28, 13, 13, 11, 22, 18, 8]
+
+  const ws: Record<string, unknown> = {}
+
+  // 헤더 행
+  COLS.forEach((label, ci) => {
+    const ref = `${COL_KEYS[ci]}1`
+    ws[ref] = {
+      v: label, t: 's',
+      s: {
+        fill: { fgColor: { rgb: HEADER_BG } },
+        font: { bold: true, color: { rgb: HEADER_FG }, sz: 10, name: '맑은 고딕' },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER },
+      },
+    }
+  })
+
+  // 데이터 행
+  all.forEach((t, ri) => {
+    const rowNum = ri + 2
+    const isEven = ri % 2 === 0
+    const bgRgb = isEven ? ROW_EVEN : 'FFFFFF'
+
+    const values: (string | number)[] = [
+      t.date,
+      t.description ?? '',
+      t.type === 'expense' ? t.amount : '',
+      t.type === 'income' ? t.amount : '',
+      t.category,
+      t.memo ?? '',
+      t.payment_method ?? '',
+      t.is_recurring ? 'Y' : '',
+    ]
+
+    values.forEach((v, ci) => {
+      const ref = `${COL_KEYS[ci]}${rowNum}`
+      const isAmountCol = ci === 2 || ci === 3
+      const isExpenseAmt = ci === 2 && typeof v === 'number'
+      const isIncomeAmt  = ci === 3 && typeof v === 'number'
+      ws[ref] = {
+        v, t: typeof v === 'number' ? 'n' : 's',
+        s: {
+          fill: { fgColor: { rgb: bgRgb } },
+          font: {
+            sz: 10,
+            name: '맑은 고딕',
+            color: { rgb: isExpenseAmt ? EXPENSE_FG : isIncomeAmt ? INCOME_FG : '1E293B' },
+            bold: isAmountCol && v !== '',
+          },
+          alignment: {
+            horizontal: isAmountCol ? 'right' : 'left',
+            vertical: 'center',
+          },
+          numFmt: isAmountCol && v !== '' ? '#,##0' : undefined,
+          border: { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER },
+        },
+      }
+    })
+  })
+
+  const lastRow = all.length + 1
+  ws['!ref'] = `A1:H${lastRow}`
+  ws['!cols'] = COL_WIDTHS.map(wch => ({ wch }))
+  ws['!rows'] = [{ hpt: 22 }, ...Array(all.length).fill({ hpt: 18 })]
+
+  const wb = XLSXStyle.utils.book_new()
+  XLSXStyle.utils.book_append_sheet(wb, ws as XLSXStyle.WorkSheet, '거래내역')
+  XLSXStyle.writeFile(wb, `fintrack_내역_${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+export default function CsvImport({ onImport, onClose, customCats = [] }: Props) {
   const [result, setResult] = useState<ParseResult | null>(null)
   const [excluded, setExcluded] = useState<Set<number>>(new Set())
   const [transferIndices, setTransferIndices] = useState<Set<number>>(new Set())
   const [duplicateIndices, setDuplicateIndices] = useState<Set<number>>(new Set())
   const [recurringIndices, setRecurringIndices] = useState<Set<number>>(new Set())
   const [editingCategoryIdx, setEditingCategoryIdx] = useState<number | null>(null)
+  const [bulkCatPrompt, setBulkCatPrompt] = useState<{ keyword: string; category: string; indices: number[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [categorizing, setCategorizing] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFile(file: File) {
@@ -135,6 +223,9 @@ export default function CsvImport({ onImport, onClose }: Props) {
   }
 
   function changeCategory(idx: number, category: string) {
+    if (!result) return
+    const keyword = result.transactions[idx].description?.trim() ?? ''
+
     setResult(prev => prev ? {
       ...prev,
       transactions: prev.transactions.map((t, i) =>
@@ -142,6 +233,36 @@ export default function CsvImport({ onImport, onClose }: Props) {
       )
     } : null)
     setEditingCategoryIdx(null)
+
+    // 같은 거래처 다른 항목 존재 시 일괄 변경 프롬프트
+    if (keyword) {
+      const matchingIndices = result.transactions
+        .map((t, i) => ({ t, i }))
+        .filter(({ t, i }) => i !== idx && t.description?.trim() === keyword && t.category !== category)
+        .map(({ i }) => i)
+      if (matchingIndices.length > 0) setBulkCatPrompt({ keyword, category, indices: matchingIndices })
+    }
+  }
+
+  function applyBulkCategory() {
+    if (!bulkCatPrompt) return
+    const { indices, category } = bulkCatPrompt
+    setResult(prev => prev ? {
+      ...prev,
+      transactions: prev.transactions.map((t, i) =>
+        indices.includes(i) ? { ...t, category, is_recurring: RECURRING_CATEGORIES.has(category) } : t
+      )
+    } : null)
+    setBulkCatPrompt(null)
+  }
+
+  function toggleRecurring(idx: number) {
+    setResult(prev => prev ? {
+      ...prev,
+      transactions: prev.transactions.map((t, i) =>
+        i === idx ? { ...t, is_recurring: !t.is_recurring } : t
+      )
+    } : null)
   }
 
   async function handleImport() {
@@ -153,6 +274,15 @@ export default function CsvImport({ onImport, onClose }: Props) {
       onClose()
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      await downloadAllTransactions()
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -200,15 +330,16 @@ export default function CsvImport({ onImport, onClose }: Props) {
             <div className="overflow-y-auto flex-1 space-y-1 mb-4">
               {result.transactions.map((tx, i) => {
                 const isExcluded = excluded.has(i)
+                const isDuplicate = duplicateIndices.has(i)
                 return (
                   <div
                     key={i}
-                    onClick={() => toggleExclude(i)}
-                    className={`flex items-center justify-between text-sm px-3 py-2.5 rounded-lg cursor-pointer select-none transition-colors ${isExcluded ? 'opacity-35 bg-gray-50' : 'hover:bg-gray-50'}`}
+                    onClick={() => !isDuplicate && toggleExclude(i)}
+                    className={`flex items-center justify-between text-sm px-3 py-2.5 rounded-lg select-none transition-colors ${isDuplicate ? 'opacity-30 bg-gray-50 cursor-not-allowed' : isExcluded ? 'opacity-35 bg-gray-50 cursor-pointer' : 'hover:bg-gray-50 cursor-pointer'}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isExcluded ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-800'}`}>
-                        {!isExcluded && <span className="text-white text-[10px] leading-none">✓</span>}
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isDuplicate || isExcluded ? 'border-gray-300 bg-white' : 'border-gray-800 bg-gray-800'}`}>
+                        {!isDuplicate && !isExcluded && <span className="text-white text-[10px] leading-none">✓</span>}
                       </div>
                       <div className="min-w-0 flex-1" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -219,8 +350,12 @@ export default function CsvImport({ onImport, onClose }: Props) {
                             <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full shrink-0">이체</span>
                           ) : editingCategoryIdx === i ? (
                             <div className="flex flex-wrap gap-1 mt-0.5">
-                              {(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => {
-                                const cc = getCategoryColor(c)
+                              {[
+                                ...(tx.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES),
+                                ...customCats.filter(c => c.type === tx.type).map(c => c.name),
+                              ].map(c => {
+                                const custom = customCats.find(cc => cc.name === c)
+                                const cc = getCategoryColor(c, custom?.color)
                                 return (
                                   <button
                                     key={c}
@@ -234,7 +369,8 @@ export default function CsvImport({ onImport, onClose }: Props) {
                             </div>
                           ) : (
                             (() => {
-                              const cc = getCategoryColor(tx.category)
+                              const custom = customCats.find(cc => cc.name === tx.category)
+                              const cc = getCategoryColor(tx.category, custom?.color)
                               return (
                                 <button
                                   onClick={() => setEditingCategoryIdx(i)}
@@ -245,8 +381,17 @@ export default function CsvImport({ onImport, onClose }: Props) {
                               )
                             })()
                           )}
-                          {recurringIndices.has(i) && !transferIndices.has(i) && editingCategoryIdx !== i && (
-                            <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full shrink-0">고정</span>
+                          {!transferIndices.has(i) && !duplicateIndices.has(i) && editingCategoryIdx !== i && (
+                            <button
+                              onClick={e => { e.stopPropagation(); toggleRecurring(i) }}
+                              className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 transition-colors ${
+                                tx.is_recurring
+                                  ? 'bg-orange-100 text-orange-600 font-medium'
+                                  : 'bg-gray-100 text-gray-400 hover:bg-orange-50 hover:text-orange-500'
+                              }`}
+                            >
+                              {tx.is_recurring ? '고정 ✓' : '고정'}
+                            </button>
                           )}
                           {tx.description && <span className="text-sm text-gray-800 font-medium truncate">{tx.description}</span>}
                         </div>
@@ -262,6 +407,31 @@ export default function CsvImport({ onImport, onClose }: Props) {
                 )
               })}
             </div>
+
+            {/* 일괄 카테고리 변경 프롬프트 */}
+            {bulkCatPrompt && (
+              <div className="mb-3 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+                <p className="text-xs text-blue-700 mb-2.5">
+                  <span className="font-semibold">"{bulkCatPrompt.keyword}"</span> 항목이{' '}
+                  <span className="font-semibold text-blue-800">{bulkCatPrompt.indices.length}건</span> 더 있어요.
+                  모두 <span className="font-semibold">{bulkCatPrompt.category}</span>로 변경할까요?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={applyBulkCategory}
+                    className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    {bulkCatPrompt.indices.length}건 모두 변경
+                  </button>
+                  <button
+                    onClick={() => setBulkCatPrompt(null)}
+                    className="flex-1 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs hover:bg-gray-200 transition-colors"
+                  >
+                    이것만
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium">취소</button>
@@ -279,6 +449,13 @@ export default function CsvImport({ onImport, onClose }: Props) {
         {!result && !error && (
           <div className="flex gap-3 mt-4">
             <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium">취소</button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex-1 py-3 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium disabled:opacity-50"
+            >
+              {exporting ? '내보내는 중...' : '📤 내역 내보내기'}
+            </button>
           </div>
         )}
       </div>

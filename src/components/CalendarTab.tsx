@@ -249,6 +249,60 @@ function DonutChart({ slices, total }: { slices: DonutSlice[]; total: number }) 
   )
 }
 
+function IncomeExpenseBar({ income, expense }: { income: number; expense: number }) {
+  const max = Math.max(income, expense)
+  if (max === 0) return null
+  const net = income - expense
+  return (
+    <div className="glass rounded-2xl px-4 py-3 space-y-2.5">
+      {income > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-medium text-cyan-400">수입</span>
+            <span className="text-xs font-bold text-cyan-300">+{income.toLocaleString('ko-KR')}원</span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${(income / max) * 100}%`,
+                background: 'linear-gradient(90deg, #0891b2, #22d3ee)',
+                boxShadow: '0 0 6px rgba(34,211,238,0.4)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {expense > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-medium text-rose-400">지출</span>
+            <span className="text-xs font-bold text-rose-300">-{expense.toLocaleString('ko-KR')}원</span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${(expense / max) * 100}%`,
+                background: 'linear-gradient(90deg, #e11d48, #fb7185)',
+                boxShadow: '0 0 6px rgba(251,113,133,0.4)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {income > 0 && expense > 0 && (
+        <div className="flex justify-end border-t border-white/6 pt-2">
+          <span className={`text-[11px] font-semibold ${net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {net >= 0 ? '+' : ''}{net.toLocaleString('ko-KR')}원&nbsp;
+            <span className="font-normal opacity-60">{net >= 0 ? '잔여' : '초과'}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function getDayColor(total: number) {
   if (total <= 0) return null
   if (total < 30000) return { bar: 'bg-emerald-400/70', text: 'text-emerald-400' }
@@ -662,27 +716,22 @@ export default function CalendarTab({
       {/* 선택된 날짜 헤더 */}
       <div className="flex items-center justify-between px-1">
         <p className="text-sm font-semibold text-white">{selectedDStr}</p>
-        <div className="flex items-center gap-2">
-          {selectedIncome > 0 && (
-            <span className="text-xs text-cyan-400 font-semibold">+{selectedIncome.toLocaleString('ko-KR')}원</span>
-          )}
-          {selectedExpense > 0 && (
-            <span className="text-xs text-rose-400 font-semibold">-{selectedExpense.toLocaleString('ko-KR')}원</span>
-          )}
-          {selectedTxs.length > 1 && (
-            <button
-              onClick={() => setReorderMode(r => !r)}
-              className={`text-xs px-2 py-0.5 rounded-full transition-all ${
-                reorderMode
-                  ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-400/30'
-                  : 'glass-sm text-white/40 hover:text-white/70'
-              }`}
-            >
-              순서
-            </button>
-          )}
-        </div>
+        {selectedTxs.length > 1 && (
+          <button
+            onClick={() => setReorderMode(r => !r)}
+            className={`text-xs px-2 py-0.5 rounded-full transition-all ${
+              reorderMode
+                ? 'bg-indigo-500/30 text-indigo-300 ring-1 ring-indigo-400/30'
+                : 'glass-sm text-white/40 hover:text-white/70'
+            }`}
+          >
+            순서
+          </button>
+        )}
       </div>
+
+      {/* 수입 / 지출 바 차트 */}
+      <IncomeExpenseBar income={selectedIncome} expense={selectedExpense} />
 
       {/* 도넛 차트 */}
       {donutSlices.length > 1 && (

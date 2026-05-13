@@ -8,11 +8,16 @@ interface Pattern {
   severity: 'high' | 'medium'
   scold: string
   tip: string
+  saving_potential?: string
 }
 
 interface CoachResult {
   patterns: Pattern[]
   overall: string | null
+  action_plan?: string[]
+  fixedTotal: number
+  variableTotal: number
+  fixedCatMap: Record<string, number>
 }
 
 interface Props {
@@ -63,7 +68,7 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
               <span className="text-xl">🔴</span>
               <div>
                 <p className="text-sm font-bold text-white">AI 소비 코치</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{year}년 {month}월 소비 진단</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{year}년 {month}월 변동 지출 진단</p>
               </div>
             </div>
             <button onClick={onClose} className="text-white/40 hover:text-white/80 transition-colors text-xl leading-none">×</button>
@@ -73,13 +78,12 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
           {!started ? (
-            /* 시작 전 */
             <div className="text-center py-6 space-y-4">
               <p className="text-4xl">😤</p>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-white">이번 달 소비, 솔직하게 봐드릴게요</p>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  칭찬보다 직설적인 피드백이 필요할 때가 있어요.<br />
+                  고정비는 제외하고 변동 지출만 집중 분석합니다.<br />
                   문제 패턴을 발견하면 단호하게 말해드립니다.
                 </p>
               </div>
@@ -92,11 +96,10 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
               </button>
             </div>
           ) : loading ? (
-            /* 로딩 */
             <div className="space-y-3 py-2">
               <div className="flex items-center gap-3 px-1">
                 <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0" />
-                <p className="text-xs text-rose-300">소비 패턴 분석 중...</p>
+                <p className="text-xs text-rose-300">변동 지출 패턴 분석 중...</p>
               </div>
               {[1, 2, 3].map(i => (
                 <div key={i} className="rounded-xl p-4 space-y-2"
@@ -108,26 +111,54 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
               ))}
             </div>
           ) : result ? (
-            /* 결과 */
             <>
+              {/* 고정비 요약 */}
+              {result.fixedTotal > 0 && (
+                <div className="rounded-xl px-3 py-2.5"
+                  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-indigo-300">🔒 고정비 (코칭 제외)</span>
+                    <span className="text-xs font-bold text-indigo-200">{result.fixedTotal.toLocaleString('ko-KR')}원</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(result.fixedCatMap)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([cat, amt]) => (
+                        <span key={cat} className="text-[10px] px-1.5 py-0.5 rounded-full text-indigo-300/70"
+                          style={{ background: 'rgba(99,102,241,0.12)' }}>
+                          {cat} {amt.toLocaleString('ko-KR')}원
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 변동비 총액 */}
+              <div className="rounded-xl px-3 py-2.5 flex items-center justify-between"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <div>
+                  <p className="text-[10px] text-white/40 mb-0.5">변동 지출 (코칭 대상)</p>
+                  <p className="text-base font-bold text-rose-300">{result.variableTotal.toLocaleString('ko-KR')}원</p>
+                </div>
+                {hasIssues && (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
+                    {result.patterns.length}개 문제
+                  </span>
+                )}
+              </div>
+
               {!hasIssues ? (
-                <div className="text-center py-8 space-y-2">
+                <div className="text-center py-6 space-y-2">
                   <p className="text-4xl">✅</p>
-                  <p className="text-sm font-semibold text-emerald-300">이번 달은 비교적 양호해요</p>
+                  <p className="text-sm font-semibold text-emerald-300">이번 달 변동 지출은 양호해요</p>
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                     {result.overall ?? '특별한 문제 패턴이 감지되지 않았어요. 이 상태를 유지하세요!'}
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="rounded-xl px-3 py-2.5 flex items-center gap-2"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                    <span className="text-sm shrink-0">📋</span>
-                    <p className="text-xs text-rose-300 font-medium">
-                      {result.patterns.length}개 문제 패턴이 감지됐어요
-                    </p>
-                  </div>
-
+                  {/* 패턴 카드 */}
                   {result.patterns.map((p, i) => (
                     <div key={i} className="rounded-xl overflow-hidden"
                       style={{
@@ -135,27 +166,32 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
                           ? '1px solid rgba(239,68,68,0.35)'
                           : '1px solid rgba(251,191,36,0.3)',
                       }}>
-                      {/* 패턴 헤더 */}
-                      <div className="px-3 py-2 flex items-center gap-2"
+                      <div className="px-3 py-2 flex items-center justify-between"
                         style={{
                           background: p.severity === 'high'
                             ? 'rgba(239,68,68,0.12)'
                             : 'rgba(251,191,36,0.08)',
                         }}>
-                        <span className="text-sm">{p.severity === 'high' ? '🚨' : '⚠️'}</span>
-                        <span className={`text-xs font-bold ${p.severity === 'high' ? 'text-rose-400' : 'text-amber-400'}`}>
-                          {p.type}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">{p.severity === 'high' ? '🚨' : '⚠️'}</span>
+                          <span className={`text-xs font-bold ${p.severity === 'high' ? 'text-rose-400' : 'text-amber-400'}`}>
+                            {p.type}
+                          </span>
+                        </div>
+                        {p.saving_potential && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                            style={{ background: 'rgba(16,185,129,0.15)', color: '#6ee7b7' }}>
+                            절감 {p.saving_potential}
+                          </span>
+                        )}
                       </div>
 
-                      {/* 혼내기 */}
                       <div className="px-3 py-3 border-t border-white/5">
                         <p className={`text-xs leading-relaxed font-medium ${p.severity === 'high' ? 'text-rose-200' : 'text-amber-200'}`}>
                           {p.scold}
                         </p>
                       </div>
 
-                      {/* 팁 */}
                       <div className="px-3 py-2.5 border-t border-white/5"
                         style={{ background: 'rgba(255,255,255,0.03)' }}>
                         <div className="flex items-start gap-2">
@@ -173,13 +209,27 @@ export default function CoachModal({ transactions, year, month, onClose }: Props
                       <p className="text-xs text-indigo-200 leading-relaxed">{result.overall}</p>
                     </div>
                   )}
+
+                  {/* 실천 플랜 */}
+                  {result.action_plan && result.action_plan.length > 0 && (
+                    <div className="rounded-xl px-4 py-3 space-y-2"
+                      style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                      <p className="text-xs font-semibold text-emerald-400 mb-2">✅ 이번 주 실천 플랜</p>
+                      {result.action_plan.map((action, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-[10px] font-bold text-emerald-500 shrink-0 mt-0.5">{i + 1}</span>
+                          <p className="text-xs text-emerald-200/80 leading-relaxed">{action}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </>
           ) : null}
         </div>
 
-        {/* Footer — 재진단 버튼 */}
+        {/* Footer */}
         {started && !loading && result && (
           <div className="px-4 pb-4 pt-2 shrink-0 border-t border-white/5">
             <button

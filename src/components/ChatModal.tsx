@@ -14,7 +14,7 @@ interface Props {
   onDataChange: () => void
 }
 
-const SUGGESTIONS = ['이번 달 얼마나 썼어?', '카테고리별로 정리해줘', '지출이 많은 항목이 뭐야?', '절약할 수 있는 부분 알려줘']
+const SUGGESTIONS = ['이번 달 얼마나 썼어?', '카테고리별로 정리해줘', '지출이 많은 항목이 뭐야?', '5월 6일 20만원 투자금 추가해줘']
 
 export default function ChatModal({ year, month, onClose, onDataChange }: Props) {
   const storageKey = `chat_${year}_${month}`

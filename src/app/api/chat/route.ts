@@ -7,6 +7,26 @@ const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'add_transaction',
+      description: '새로운 거래 내역을 추가합니다. 사용자가 내역 추가를 요청하면 이 도구를 사용합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['income', 'expense'], description: '수입(income) 또는 지출(expense)' },
+          amount: { type: 'number', description: '금액 (양수)' },
+          category: { type: 'string', description: '카테고리 (식비/카페/편의점/교통/쇼핑/구독/주거/의료/문화/교육/투자/보험/적금/급여/부업/기타)' },
+          description: { type: 'string', description: '거래 내용·상호명' },
+          date: { type: 'string', description: '날짜 (YYYY-MM-DD 형식)' },
+          memo: { type: 'string', description: '메모 (선택)' },
+          is_recurring: { type: 'boolean', description: '고정 지출 여부 (구독·렌트 등)' },
+        },
+        required: ['type', 'amount', 'category', 'date']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'delete_transaction',
       description: '거래 내역 항목을 삭제합니다.',
       parameters: {
@@ -40,6 +60,18 @@ const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function executeTool(name: string, args: Record<string, unknown>, supabase: SupabaseClient<any>): Promise<string> {
+  if (name === 'add_transaction') {
+    const { error } = await supabase.from('transactions').insert({
+      type: args.type,
+      amount: args.amount,
+      category: args.category,
+      description: args.description ?? null,
+      date: args.date,
+      memo: args.memo ?? null,
+      is_recurring: args.is_recurring ?? false,
+    })
+    return error ? `추가 실패: ${error.message}` : '추가 성공'
+  }
   if (name === 'delete_transaction') {
     const { error } = await supabase.from('transactions').delete().eq('id', args.id as string)
     return error ? `삭제 실패: ${error.message}` : '삭제 성공'

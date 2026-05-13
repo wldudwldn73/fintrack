@@ -253,55 +253,53 @@ export default function Home() {
       <div className="max-w-md mx-auto px-4 pt-6 pb-28 space-y-4">
 
         {/* Header */}
-        <header className="flex items-center justify-between anim-up">
-          <div>
+        <header className="anim-up space-y-1.5">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xl font-bold gradient-text tracking-tight">Fintrack</span>
               <span className="ai-badge text-xs px-2 py-0.5 rounded-full text-indigo-300 font-semibold">AI</span>
             </div>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {user?.user_metadata?.name ?? user?.user_metadata?.username ?? user?.email?.split('@')[0] ?? ''}님의 스마트 가계부
-            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowCoach(true)}
+                className="glass text-base rounded-xl px-2.5 py-1.5 transition-all hover:scale-105 active:scale-95 leading-none"
+                title="AI 소비 코치"
+              >
+                😤
+              </button>
+              <button
+                onClick={() => setShowLearnedCategories(true)}
+                className="glass text-base rounded-xl px-2.5 py-1.5 transition-all hover:scale-105 active:scale-95 leading-none"
+                title="AI 기억 목록"
+              >
+                🧠
+              </button>
+              <button
+                onClick={() => setShowChat(true)}
+                className="glass ai-badge text-xs text-indigo-300 rounded-xl px-2.5 py-1.5 transition-all hover:scale-105 active:scale-95 font-medium flex items-center gap-1"
+              >
+                <span className="pulse-dot inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                AI분석
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="glass text-xs rounded-xl px-2.5 py-1.5 transition-all hover:scale-105 active:scale-95 font-medium"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                CSV
+              </button>
+              <button
+                onClick={handleLogout}
+                className="glass text-xs rounded-xl px-2.5 py-1.5 transition-all hover:scale-105 active:scale-95"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                로그아웃
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCoach(true)}
-              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-              title="AI 소비 코치"
-            >
-              😤
-            </button>
-            <button
-              onClick={() => setShowLearnedCategories(true)}
-              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-              title="AI 기억 목록"
-            >
-              🧠
-            </button>
-            <button
-              onClick={() => setShowChat(true)}
-              className="glass ai-badge text-xs text-indigo-300 rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium flex items-center gap-1.5"
-            >
-              <span className="pulse-dot inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-              AI 분석
-            </button>
-            <button
-              onClick={() => setShowImport(true)}
-              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95 font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              CSV
-            </button>
-            <button
-              onClick={handleLogout}
-              className="glass text-xs rounded-xl px-3 py-2 transition-all hover:scale-105 active:scale-95"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              로그아웃
-            </button>
-          </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {user?.user_metadata?.name ?? user?.user_metadata?.username ?? user?.email?.split('@')[0] ?? ''}님의 스마트 가계부
+          </p>
         </header>
 
         {/* Monthly Summary — uses active (non-excluded) transactions */}
@@ -438,7 +436,7 @@ export default function Home() {
 
       {showForm && <TransactionForm onSubmit={handleAdd} onClose={() => setShowForm(false)} />}
       {showChat && <ChatModal year={year} month={month} onClose={() => setShowChat(false)} onDataChange={load} />}
-      {showImport && <CsvImport onImport={handleImport} onClose={() => setShowImport(false)} />}
+      {showImport && <CsvImport onImport={handleImport} onClose={() => setShowImport(false)} customCats={customCats} />}
       {showLearnedCategories && <LearnedCategoriesModal onClose={() => setShowLearnedCategories(false)} />}
       {showCoach && (
         <CoachModal
