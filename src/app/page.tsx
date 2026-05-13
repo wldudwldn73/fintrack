@@ -22,6 +22,7 @@ import IncomeCandidateBanner, { INCOME_KEYWORDS, loadDismissed, saveDismissed } 
 import { getBudgets } from '@/lib/budget'
 import { getCategoryWidgets, upsertCategoryWidget, deleteCategoryWidget, type CategoryWidget } from '@/lib/categoryWidgets'
 import SettingsModal from '@/components/SettingsModal'
+import MonthlyTrendChart from '@/components/MonthlyTrendChart'
 import { generateInsights } from '@/lib/insights'
 import SupportItemBanner from '@/components/SupportItemBanner'
 import { SUPPORT_KEYWORDS, loadDismissedSupport, saveDismissedSupport, getSupportItems, addSupportItem, type SupportItem } from '@/lib/supportItems'
@@ -402,6 +403,7 @@ export default function Home() {
                 <span>위젯 관리</span>
               </button>
             </div>
+            <MonthlyTrendChart />
             <BudgetCard
               transactions={activeTransactions}
               budgets={budgets}
