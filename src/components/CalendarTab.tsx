@@ -287,6 +287,8 @@ export default function CalendarTab({
   } | null>(null)
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineEditValue, setInlineEditValue] = useState('')
+  const [amountEditId, setAmountEditId] = useState<string | null>(null)
+  const [amountEditValue, setAmountEditValue] = useState('')
   const [reorderMode, setReorderMode] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [bulkPrompt, setBulkPrompt] = useState<{ keyword: string; category: string; count: number } | null>(null)
@@ -528,6 +530,15 @@ export default function CalendarTab({
       onMetaChange(tx.id, newDesc, tx.memo ?? null)
     }
     setInlineEditId(null)
+  }
+
+  async function saveAmountEdit(tx: Transaction) {
+    const newAmount = Number(amountEditValue.replace(/,/g, ''))
+    if (!isNaN(newAmount) && newAmount > 0 && newAmount !== tx.amount) {
+      await updateTransactionAmount(tx.id, newAmount)
+      onAmountChange(tx.id, newAmount)
+    }
+    setAmountEditId(null)
   }
 
   async function handleDelete(id: string) {
@@ -920,13 +931,35 @@ export default function CalendarTab({
                       )}
                     </div>
                     <div className="flex items-center gap-2 ml-3 shrink-0">
-                      <span className={`text-sm font-bold ${
-                        tx.is_excluded ? 'text-white/35 line-through' :
-                        tx.type === 'income' ? 'text-cyan-300' : 'text-rose-300'
-                      }`}>
-                        {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('ko-KR')}
-                        <span className="text-xs font-normal ml-0.5 opacity-50">원</span>
-                      </span>
+                      {amountEditId === tx.id ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={amountEditValue}
+                          onChange={e => setAmountEditValue(e.target.value)}
+                          onBlur={() => saveAmountEdit(tx)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); saveAmountEdit(tx) }
+                            if (e.key === 'Escape') setAmountEditId(null)
+                          }}
+                          className="w-24 text-right glass-sm rounded-lg px-2 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+                        />
+                      ) : (
+                        <span
+                          className={`text-sm font-bold cursor-pointer select-none ${
+                            tx.is_excluded ? 'text-white/35 line-through' :
+                            tx.type === 'income' ? 'text-cyan-300' : 'text-rose-300'
+                          }`}
+                          onDoubleClick={() => {
+                            setAmountEditId(tx.id)
+                            setAmountEditValue(String(tx.amount))
+                          }}
+                          title="더블클릭하여 금액 수정"
+                        >
+                          {tx.type === 'income' ? '+' : '-'}{tx.amount.toLocaleString('ko-KR')}
+                          <span className="text-xs font-normal ml-0.5 opacity-50">원</span>
+                        </span>
+                      )}
                       <button
                         onClick={() => setConfirmDeleteId(tx.id)}
                         className="text-white/15 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all text-lg leading-none"
