@@ -43,14 +43,12 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'list' | 'category' | 'dashboard'>('list')
   const [customCats, setCustomCats] = useState<CustomCat[]>([])
-  const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(new Set())
-  const [dismissedSupport, setDismissedSupport] = useState<Set<string>>(new Set())
+  const [dismissedIncome, setDismissedIncome] = useState<Set<string>>(() => loadDismissed())
+  const [dismissedSupport, setDismissedSupport] = useState<Set<string>>(() => loadDismissedSupport())
   const [supportItems, setSupportItems] = useState<SupportItem[]>([])
   const [widgets, setWidgets] = useState<CategoryWidget[]>([])
   const [showSettings, setShowSettings] = useState(false)
 
-  useEffect(() => { setDismissedIncome(loadDismissed()) }, [])
-  useEffect(() => { setDismissedSupport(loadDismissedSupport()) }, [])
   useEffect(() => {
     getCategoryWidgets().then(setWidgets).catch(() => {})
   }, [])

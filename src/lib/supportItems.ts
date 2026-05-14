@@ -51,7 +51,9 @@ export async function addSupportItem(item: {
   category: string
   date: string
 }): Promise<void> {
-  const { error } = await supabase.from('support_items').insert(item)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('로그인이 필요합니다')
+  const { error } = await supabase.from('support_items').insert({ ...item, user_id: user.id })
   if (error) throw error
 }
 

@@ -12,6 +12,7 @@ interface Props {
 export default function SupportItemBanner({ candidates, onConfirm, onDismiss }: Props) {
   const [index, setIndex] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (candidates.length === 0) return null
   const current = candidates[Math.min(index, candidates.length - 1)]
@@ -27,9 +28,12 @@ export default function SupportItemBanner({ candidates, onConfirm, onDismiss }: 
 
   async function handleConfirm() {
     setLoading(true)
+    setError(null)
     try {
       await onConfirm(current)
       if (index >= candidates.length - 1) setIndex(Math.max(0, candidates.length - 2))
+    } catch {
+      setError('등록에 실패했습니다. 다시 시도해 주세요.')
     } finally {
       setLoading(false)
     }
@@ -100,6 +104,7 @@ export default function SupportItemBanner({ candidates, onConfirm, onDismiss }: 
             아니에요
           </button>
         </div>
+        {error && <p className="text-xs text-red-400 mt-1.5">{error}</p>}
       </div>
     </div>
   )
