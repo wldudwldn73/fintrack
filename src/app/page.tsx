@@ -201,6 +201,7 @@ export default function Home() {
       category: '지원',
       date: tx.date,
       created_at: new Date().toISOString(),
+      purpose: null,
     }])
   }
 
@@ -442,6 +443,7 @@ export default function Home() {
           items={supportItems}
           year={year}
           month={month}
+          transactions={transactions}
           onAdd={item => setSupportItems(prev => [...prev, item])}
           onDelete={id => setSupportItems(prev => prev.filter(i => i.id !== id))}
           onClose={() => setShowSupportModal(false)}

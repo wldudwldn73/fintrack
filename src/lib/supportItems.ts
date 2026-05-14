@@ -27,6 +27,14 @@ export interface SupportItem {
   category: string
   date: string
   created_at: string
+  purpose: string | null
+}
+
+export interface SupportAllocation {
+  id: string
+  support_item_id: string
+  transaction_id: string
+  created_at: string
 }
 
 export async function getSupportItems(year: number, month: number): Promise<SupportItem[]> {
@@ -50,6 +58,7 @@ export async function addSupportItem(item: {
   amount: number
   category: string
   date: string
+  purpose?: string
 }): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('로그인이 필요합니다')
@@ -59,5 +68,32 @@ export async function addSupportItem(item: {
 
 export async function deleteSupportItem(id: string): Promise<void> {
   const { error } = await supabase.from('support_items').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getMonthAllocations(supportItemIds: string[]): Promise<SupportAllocation[]> {
+  if (supportItemIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('support_allocations')
+    .select('*')
+    .in('support_item_id', supportItemIds)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function addAllocation(supportItemId: string, transactionId: string): Promise<SupportAllocation> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('로그인이 필요합니다')
+  const { data, error } = await supabase
+    .from('support_allocations')
+    .insert({ support_item_id: supportItemId, transaction_id: transactionId, user_id: user.id })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteAllocation(id: string): Promise<void> {
+  const { error } = await supabase.from('support_allocations').delete().eq('id', id)
   if (error) throw error
 }
