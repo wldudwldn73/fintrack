@@ -25,6 +25,7 @@ import SettingsModal from '@/components/SettingsModal'
 import MonthlyTrendChart from '@/components/MonthlyTrendChart'
 import { generateInsights } from '@/lib/insights'
 import SupportItemBanner from '@/components/SupportItemBanner'
+import SupportItemsModal from '@/components/SupportItemsModal'
 import { SUPPORT_KEYWORDS, loadDismissedSupport, saveDismissedSupport, getSupportItems, addSupportItem, type SupportItem } from '@/lib/supportItems'
 
 export default function Home() {
@@ -48,6 +49,7 @@ export default function Home() {
   const [supportItems, setSupportItems] = useState<SupportItem[]>([])
   const [widgets, setWidgets] = useState<CategoryWidget[]>([])
   const [showSettings, setShowSettings] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
 
   useEffect(() => {
     getCategoryWidgets().then(setWidgets).catch(() => {})
@@ -310,6 +312,7 @@ export default function Home() {
             onPrev={prevMonth}
             onNext={nextMonth}
             supportTotal={supportTotal}
+            onSupportClick={() => setShowSupportModal(true)}
           />
         </div>
 
@@ -434,6 +437,16 @@ export default function Home() {
         +
       </button>
 
+      {showSupportModal && (
+        <SupportItemsModal
+          items={supportItems}
+          year={year}
+          month={month}
+          onAdd={item => setSupportItems(prev => [...prev, item])}
+          onDelete={id => setSupportItems(prev => prev.filter(i => i.id !== id))}
+          onClose={() => setShowSupportModal(false)}
+        />
+      )}
       {showForm && <TransactionForm onSubmit={handleAdd} onClose={() => setShowForm(false)} />}
       {showChat && <ChatModal year={year} month={month} onClose={() => setShowChat(false)} onDataChange={load} />}
       {showImport && <CsvImport onImport={handleImport} onClose={() => setShowImport(false)} customCats={customCats} />}
