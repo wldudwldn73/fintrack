@@ -127,6 +127,11 @@ export async function updateTransactionAmount(id: string, amount: number): Promi
   if (error) throw error
 }
 
+export async function updateTransactionDate(id: string, date: string): Promise<void> {
+  const { error } = await supabase.from('transactions').update({ date }).eq('id', id)
+  if (error) throw error
+}
+
 export async function updateTransactionHidden(id: string, is_hidden: boolean): Promise<void> {
   const { error } = await supabase.from('transactions').update({ is_hidden }).eq('id', id)
   if (error) throw error

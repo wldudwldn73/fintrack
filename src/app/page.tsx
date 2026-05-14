@@ -158,6 +158,10 @@ export default function Home() {
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, amount } : t))
   }
 
+  function handleDateChange(id: string, date: string) {
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, date } : t))
+  }
+
   async function handleWidgetSave(w: Omit<CategoryWidget, 'id'> & { id?: string }) {
     const withOrder = w.id ? w : { ...w, sort_order: widgets.length }
     const saved = await upsertCategoryWidget(withOrder)
@@ -387,6 +391,7 @@ export default function Home() {
               onAmountChange={handleAmountChange}
               onSortOrderChange={handleSortOrderChange}
               onHiddenChange={handleHiddenChange}
+              onDateChange={handleDateChange}
             />
           </div>
         ) : tab === 'category' ? (

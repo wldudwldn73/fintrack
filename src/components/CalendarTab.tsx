@@ -11,6 +11,7 @@ import {
   updateTransactionHidden,
   updateTransactionMeta,
   updateTransactionAmount,
+  updateTransactionDate,
   updateTransactionSortOrders,
   excludeTransactionsByKeyword,
   deleteTransaction,
@@ -33,6 +34,7 @@ interface Props {
   onAmountChange: (id: string, amount: number) => void
   onSortOrderChange: (updates: { id: string; sort_order: number }[]) => void
   onHiddenChange: (id: string, is_hidden: boolean) => void
+  onDateChange: (id: string, date: string) => void
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -319,7 +321,7 @@ function fmt(n: number) {
 export default function CalendarTab({
   transactions, year, month,
   customCats, onCatsChange,
-  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onAmountChange, onSortOrderChange, onHiddenChange,
+  onDelete, onCategoryChange, onBulkCategoryChange, onRecurringChange, onExcludedChange, onBulkExcludedChange, onMetaChange, onAmountChange, onSortOrderChange, onHiddenChange, onDateChange,
 }: Props) {
   const today = new Date()
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -341,6 +343,7 @@ export default function CalendarTab({
     description: string
     memo: string
     amount: string
+    date: string
   } | null>(null)
   const [inlineEditId, setInlineEditId] = useState<string | null>(null)
   const [inlineEditValue, setInlineEditValue] = useState('')
@@ -501,6 +504,7 @@ export default function CalendarTab({
       description: tx.description ?? '',
       memo: tx.memo ?? '',
       amount: String(tx.amount),
+      date: tx.date,
     })
   }
 
@@ -547,6 +551,11 @@ export default function CalendarTab({
       if (newDesc !== tx.description || newMemo !== (tx.memo ?? null)) {
         promises.push(updateTransactionMeta(tx.id, { description: newDesc, memo: newMemo }))
         onMetaChange(tx.id, newDesc, newMemo)
+      }
+      if (editState.date !== tx.date) {
+        promises.push(updateTransactionDate(tx.id, editState.date))
+        onDateChange(tx.id, editState.date)
+        setSelectedDate(editState.date)
       }
       await Promise.all(promises)
 
@@ -808,6 +817,7 @@ export default function CalendarTab({
                 || editState.description !== (tx.description ?? '')
                 || editState.memo !== (tx.memo ?? '')
                 || Number(editState.amount) !== tx.amount
+                || editState.date !== tx.date
               : false
 
             return (
@@ -834,6 +844,14 @@ export default function CalendarTab({
                 <div className="flex-1 min-w-0">
                 {isEditing && editState ? (
                   <div className="space-y-2.5">
+                    {/* 날짜 편집 */}
+                    <input
+                      type="date"
+                      value={editState.date}
+                      onChange={e => setEditState(s => s ? { ...s, date: e.target.value } : s)}
+                      className="w-full glass-sm rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+                      style={{ colorScheme: 'dark' }}
+                    />
                     {/* 금액 편집 */}
                     <div className="flex items-center gap-2">
                       <input
@@ -909,8 +927,14 @@ export default function CalendarTab({
                       >
                         {saving ? '저장 중…' : '저장'}
                       </button>
-                      <button onClick={cancelEdit} className="text-xs px-2 py-0.5 rounded-full glass-sm text-rose-400">
+                      <button onClick={cancelEdit} className="text-xs px-2 py-0.5 rounded-full glass-sm text-white/40">
                         취소
+                      </button>
+                      <button
+                        onClick={() => { cancelEdit(); setConfirmDeleteId(tx.id) }}
+                        className="text-xs px-2 py-0.5 rounded-full glass-sm text-rose-400 hover:bg-rose-500/15 transition-colors ml-auto"
+                      >
+                        삭제
                       </button>
                     </div>
                   </div>
@@ -1018,7 +1042,7 @@ export default function CalendarTab({
                       )}
                       <button
                         onClick={() => setConfirmDeleteId(tx.id)}
-                        className="text-white/15 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all text-lg leading-none"
+                        className="text-white/20 hover:text-rose-400 transition-colors text-lg leading-none"
                       >
                         ×
                       </button>
