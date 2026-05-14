@@ -26,9 +26,7 @@ export default function SupportItemsModal({ items, year, month, transactions, on
 
   const [allocations, setAllocations] = useState<SupportAllocation[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [showTxPicker, setShowTxPicker] = useState<string | null>(null)
-  const [linkingTxId, setLinkingTxId] = useState<string | null>(null)
-  const [deletingAllocId, setDeletingAllocId] = useState<string | null>(null)
+  const [togglingTxId, setTogglingTxId] = useState<string | null>(null)
 
   const fmt = (n: number) => n.toLocaleString('ko-KR')
   const total = items.reduce((s, i) => s + i.amount, 0)
@@ -37,8 +35,6 @@ export default function SupportItemsModal({ items, year, month, transactions, on
     if (items.length === 0) return
     getMonthAllocations(items.map(i => i.id)).then(setAllocations).catch(() => {})
   }, [items])
-
-  const linkedTxIds = new Set(allocations.map(a => a.transaction_id))
 
   function getAllocsFor(itemId: string) {
     return allocations.filter(a => a.support_item_id === itemId)
@@ -93,39 +89,36 @@ export default function SupportItemsModal({ items, year, month, transactions, on
     }
   }
 
-  async function handleLinkTx(supportItemId: string, txId: string) {
-    setLinkingTxId(txId)
+  async function handleToggleTx(supportItemId: string, tx: Transaction) {
+    const itemAllocs = getAllocsFor(supportItemId)
+    const existing = itemAllocs.find(a => a.transaction_id === tx.id)
+    setTogglingTxId(tx.id)
+    setError(null)
     try {
-      const alloc = await addAllocation(supportItemId, txId)
-      setAllocations(prev => [...prev, alloc])
-      setShowTxPicker(null)
+      if (existing) {
+        await deleteAllocation(existing.id)
+        setAllocations(prev => prev.filter(a => a.id !== existing.id))
+      } else {
+        const alloc = await addAllocation(supportItemId, tx.id)
+        setAllocations(prev => [...prev, alloc])
+      }
     } catch {
-      setError('연결에 실패했습니다.')
+      setError(existing ? '연결 해제에 실패했습니다.' : '연결에 실패했습니다.')
     } finally {
-      setLinkingTxId(null)
+      setTogglingTxId(null)
     }
   }
 
-  async function handleUnlinkTx(allocId: string) {
-    setDeletingAllocId(allocId)
-    try {
-      await deleteAllocation(allocId)
-      setAllocations(prev => prev.filter(a => a.id !== allocId))
-    } catch {
-      setError('연결 해제에 실패했습니다.')
-    } finally {
-      setDeletingAllocId(null)
-    }
-  }
-
-  const expenseTransactions = transactions.filter(t => t.type === 'expense' && !t.is_excluded && !t.is_hidden)
+  const expenseTransactions = transactions
+    .filter(t => t.type === 'expense' && !t.is_excluded && !t.is_hidden)
+    .sort((a, b) => b.date.localeCompare(a.date))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}>
       <div className="absolute inset-0" onClick={onClose} />
       <div
         className="relative w-full max-w-md rounded-t-3xl flex flex-col"
-        style={{ background: 'var(--glass-bg, rgba(15,15,30,0.98))', border: '1px solid rgba(250,204,21,0.2)', borderBottom: 'none', maxHeight: '90vh' }}
+        style={{ background: 'rgba(15,15,30,0.98)', border: '1px solid rgba(250,204,21,0.2)', borderBottom: 'none', maxHeight: '90vh' }}
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -150,6 +143,7 @@ export default function SupportItemsModal({ items, year, month, transactions, on
               const used = getUsedAmount(item.id)
               const remaining = item.amount - used
               const usedPct = Math.min(100, item.amount > 0 ? Math.round((used / item.amount) * 100) : 0)
+              const linkedCount = itemAllocs.length
 
               return (
                 <div
@@ -164,6 +158,9 @@ export default function SupportItemsModal({ items, year, month, transactions, on
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-white truncate">{item.source_name ?? '(출처 없음)'}</p>
                           <span className="text-white/25 text-xs">{isExpanded ? '∧' : '∨'}</span>
+                          {linkedCount > 0 && (
+                            <span className="text-xs text-yellow-400/60">{linkedCount}건 연결됨</span>
+                          )}
                         </div>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                           {d.getMonth() + 1}월 {d.getDate()}일
@@ -201,87 +198,67 @@ export default function SupportItemsModal({ items, year, month, transactions, on
                     </div>
                   </div>
 
-                  {/* 확장 영역 */}
+                  {/* 확장 — 체크박스 지출 목록 */}
                   {isExpanded && (
-                    <div className="px-4 pb-3 pt-1 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      {/* 연결된 지출 목록 */}
-                      {itemAllocs.length === 0 ? (
-                        <p className="text-xs py-1" style={{ color: 'var(--text-muted)' }}>연결된 지출이 없습니다</p>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="px-4 py-2 flex items-center justify-between">
+                        <p className="text-xs font-semibold text-white/40">지출 연결</p>
+                        {linkedCount > 0 && (
+                          <p className="text-xs text-yellow-400/60">{linkedCount}건 · {fmt(used)}원</p>
+                        )}
+                      </div>
+                      {expenseTransactions.length === 0 ? (
+                        <p className="text-xs text-center px-4 pb-3" style={{ color: 'var(--text-muted)' }}>이번 달 지출 내역이 없습니다</p>
                       ) : (
-                        <div className="space-y-1.5">
-                          {itemAllocs.map(alloc => {
-                            const tx = transactions.find(t => t.id === alloc.transaction_id)
-                            if (!tx) return null
+                        <div className="divide-y divide-white/5">
+                          {expenseTransactions.map(tx => {
+                            const isChecked = itemAllocs.some(a => a.transaction_id === tx.id)
+                            const isToggling = togglingTxId === tx.id
+                            const txDate = new Date(tx.date + 'T00:00:00')
                             return (
-                              <div key={alloc.id} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-medium text-white/80 truncate">{tx.description || tx.category}</p>
+                              <button
+                                key={tx.id}
+                                onClick={() => !isToggling && handleToggleTx(item.id, tx)}
+                                disabled={isToggling}
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5 active:bg-white/10 disabled:opacity-60"
+                                style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
+                              >
+                                {/* 체크박스 */}
+                                <div
+                                  className="shrink-0 w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                                  style={{
+                                    background: isChecked ? 'rgba(250,204,21,0.25)' : 'rgba(255,255,255,0.06)',
+                                    border: isChecked ? '1.5px solid rgba(250,204,21,0.7)' : '1.5px solid rgba(255,255,255,0.15)',
+                                  }}
+                                >
+                                  {isToggling ? (
+                                    <span className="text-xs text-yellow-400 animate-pulse">·</span>
+                                  ) : isChecked ? (
+                                    <span className="text-yellow-300 text-xs font-bold">✓</span>
+                                  ) : null}
+                                </div>
+
+                                {/* 날짜 */}
+                                <span className="text-xs shrink-0 w-8" style={{ color: 'var(--text-muted)' }}>
+                                  {txDate.getMonth() + 1}/{txDate.getDate()}
+                                </span>
+
+                                {/* 내용 */}
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-xs font-medium truncate ${isChecked ? 'text-white/90' : 'text-white/55'}`}>
+                                    {tx.description || tx.category}
+                                  </p>
                                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{tx.category}</p>
                                 </div>
-                                <div className="flex items-center gap-2 ml-2 shrink-0">
-                                  <span className="text-xs font-semibold text-white/70">{fmt(tx.amount)}원</span>
-                                  <button
-                                    onClick={() => handleUnlinkTx(alloc.id)}
-                                    disabled={deletingAllocId === alloc.id}
-                                    className="text-white/20 hover:text-rose-400 transition-colors text-base leading-none disabled:opacity-40"
-                                  >
-                                    {deletingAllocId === alloc.id ? '…' : '×'}
-                                  </button>
-                                </div>
-                              </div>
+
+                                {/* 금액 */}
+                                <span className={`text-xs font-semibold shrink-0 ${isChecked ? 'text-yellow-300' : 'text-white/40'}`}>
+                                  {fmt(tx.amount)}원
+                                </span>
+                              </button>
                             )
                           })}
                         </div>
-                      )}
-
-                      {/* 지출 연결 버튼 */}
-                      {showTxPicker === item.id ? (
-                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <div className="flex items-center justify-between px-3 py-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                            <p className="text-xs font-semibold text-white/60">지출 내역 선택</p>
-                            <button onClick={() => setShowTxPicker(null)} className="text-white/30 hover:text-white/60 text-sm">✕</button>
-                          </div>
-                          <div className="max-h-40 overflow-y-auto">
-                            {expenseTransactions.length === 0 ? (
-                              <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>이번 달 지출 내역이 없습니다</p>
-                            ) : (
-                              expenseTransactions.map(tx => {
-                                const alreadyLinked = linkedTxIds.has(tx.id)
-                                return (
-                                  <button
-                                    key={tx.id}
-                                    onClick={() => !alreadyLinked && handleLinkTx(item.id, tx.id)}
-                                    disabled={alreadyLinked || linkingTxId === tx.id}
-                                    className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors disabled:opacity-40"
-                                    style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
-                                  >
-                                    <div className="min-w-0">
-                                      <p className={`text-xs font-medium truncate ${alreadyLinked ? 'text-white/30' : 'text-white/80'}`}>
-                                        {tx.description || tx.category}
-                                      </p>
-                                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{tx.category}</p>
-                                    </div>
-                                    <div className="ml-2 shrink-0 text-right">
-                                      <p className={`text-xs font-semibold ${alreadyLinked ? 'text-white/30' : 'text-white/70'}`}>
-                                        {fmt(tx.amount)}원
-                                      </p>
-                                      {alreadyLinked && <p className="text-xs text-yellow-400/50">연결됨</p>}
-                                      {linkingTxId === tx.id && <p className="text-xs text-yellow-400">연결 중…</p>}
-                                    </div>
-                                  </button>
-                                )
-                              })
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setShowTxPicker(item.id)}
-                          className="w-full py-2 rounded-xl text-xs font-medium text-yellow-400/70 hover:text-yellow-300 transition-colors"
-                          style={{ border: '1px dashed rgba(250,204,21,0.3)' }}
-                        >
-                          + 지출 연결
-                        </button>
                       )}
                     </div>
                   )}
