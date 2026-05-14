@@ -239,18 +239,21 @@ function WidgetEditor({
 }
 
 function WidgetCard({
-  widget, expenses, customCats, onEdit, onDelete,
+  widget, expenses, customCats, onEdit, onDelete, onCategoryClick,
 }: {
   widget: CategoryWidget
   expenses: Transaction[]
   customCats?: CustomCat[]
   onEdit: () => void
   onDelete: () => void
+  onCategoryClick: (cat: string, txs: Transaction[]) => void
 }) {
   const catAmts: Record<string, number> = {}
+  const catTxs: Record<string, Transaction[]> = {}
   for (const t of expenses) {
     if (widget.categories.includes(t.category)) {
       catAmts[t.category] = (catAmts[t.category] ?? 0) + t.amount
+      catTxs[t.category] = [...(catTxs[t.category] ?? []), t]
     }
   }
   const total = widget.categories.reduce((s, c) => s + (catAmts[c] ?? 0), 0)
@@ -285,12 +288,18 @@ function WidgetCard({
           const amt = catAmts[cat] ?? 0
           const cc = catColor(cat)
           const pct = total > 0 ? Math.round((amt / total) * 100) : 0
+          const txs = catTxs[cat] ?? []
           return (
-            <div key={cat} className={`px-3 py-3 text-center ${amt === 0 ? 'opacity-30' : ''}`}>
+            <button
+              key={cat}
+              onClick={() => amt > 0 && onCategoryClick(cat, txs)}
+              disabled={amt === 0}
+              className={`px-3 py-3 text-center w-full transition-all ${amt === 0 ? 'opacity-30 cursor-default' : 'hover:bg-white/5 active:bg-white/10'}`}
+            >
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cc.bg} ${cc.text}`}>{cat}</span>
               <p className="text-sm font-bold text-white mt-2">{amt > 0 ? amt.toLocaleString('ko-KR') : '-'}</p>
               {amt > 0 && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{pct}%</p>}
-            </div>
+            </button>
           )
         })}
       </div>
@@ -298,9 +307,12 @@ function WidgetCard({
   )
 }
 
+type Drilldown = { cat: string; txs: Transaction[] } | null
+
 export default function Dashboard({ transactions, year, month, customCats, onCategoryChange, widgets, onWidgetSave, onWidgetDelete, onAmountChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [drilldown, setDrilldown] = useState<Drilldown>(null)
   const expenses         = transactions.filter(t => t.type === 'expense')
   const fixedExpenses    = expenses.filter(t => t.is_recurring)
   const variableExpenses = expenses.filter(t => !t.is_recurring)
@@ -390,6 +402,7 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
             customCats={customCats}
             onEdit={() => setEditingId(widget.id)}
             onDelete={() => onWidgetDelete(widget.id)}
+            onCategoryClick={(cat, txs) => setDrilldown({ cat, txs })}
           />
         )
       )}
@@ -517,6 +530,51 @@ export default function Dashboard({ transactions, year, month, customCats, onCat
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 카테고리 드릴다운 모달 */}
+      {drilldown && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}>
+          <div className="absolute inset-0" onClick={() => setDrilldown(null)} />
+          <div
+            className="relative w-full max-w-md rounded-t-3xl flex flex-col"
+            style={{ background: 'rgba(15,15,30,0.98)', border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none', maxHeight: '80vh' }}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div>
+                <div className="flex items-center gap-2">
+                  {(() => { const cc = catColor(drilldown.cat); return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cc.bg} ${cc.text}`}>{drilldown.cat}</span> })()}
+                  <h2 className="text-base font-bold text-white">내역</h2>
+                </div>
+                <p className="text-xs mt-0.5 font-semibold text-orange-300">
+                  총 {drilldown.txs.reduce((s, t) => s + t.amount, 0).toLocaleString('ko-KR')}원 · {drilldown.txs.length}건
+                </p>
+              </div>
+              <button onClick={() => setDrilldown(null)} className="text-white/40 hover:text-white/70 text-xl leading-none transition-colors">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 divide-y divide-white/5">
+              {drilldown.txs.sort((a, b) => b.date.localeCompare(a.date)).map(tx => {
+                const d = new Date(tx.date + 'T00:00:00')
+                return (
+                  <div key={tx.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        {d.getMonth() + 1}/{d.getDate()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm text-white/85 truncate">{tx.description ?? '(내역없음)'}</p>
+                        {tx.memo && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{tx.memo}</p>}
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold text-white/80 ml-3 shrink-0">
+                      {tx.amount.toLocaleString('ko-KR')}원
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
