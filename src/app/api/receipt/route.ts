@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import sharp from 'sharp'
 import { EXPENSE_CATEGORIES } from '@/lib/types'
 
@@ -29,22 +29,14 @@ export async function POST(req: NextRequest) {
   const today = new Date().toISOString().slice(0, 10)
   const categories = EXPENSE_CATEGORIES.join(', ')
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!)
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
-  const message = await client.messages.create({
-    model: 'claude-opus-4-7',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
-          },
-          {
-            type: 'text',
-            text: `이 영수증 이미지를 분석해서 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
+  const result = await model.generateContent([
+    {
+      inlineData: { mimeType: 'image/jpeg', data: base64 },
+    },
+    `이 영수증 이미지를 분석해서 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
 {
   "storeName": "가맹점명",
@@ -59,13 +51,9 @@ export async function POST(req: NextRequest) {
 - date가 불명확하면 오늘(${today}) 사용
 - category는 가맹점 업종에 맞게 선택
 - items가 없으면 빈 배열 []`,
-          },
-        ],
-      },
-    ],
-  })
+  ])
 
-  const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+  const text = result.response.text().trim()
   const jsonMatch = text.match(/\{[\s\S]*\}/)
 
   if (!jsonMatch) {
