@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const { transactions } = await req.json()
   if (!transactions?.length) return Response.json({ categories: [] })
 
@@ -22,10 +23,12 @@ export async function POST(req: NextRequest) {
   if (dbIndices.length > 0) {
     const merchants = [...new Set(dbIndices.map(i => (transactions[i].description ?? '').trim()).filter(Boolean))]
     if (merchants.length > 0) {
-      const { data } = await supabase
+      let query = supabase
         .from('merchant_categories')
         .select('merchant, category')
         .in('merchant', merchants)
+      if (user) query = query.eq('user_id', user.id)
+      const { data } = await query
       if (data) {
         const map = new Map(data.map((d: { merchant: string; category: string }) => [d.merchant, d.category]))
         for (const i of dbIndices) {
@@ -64,17 +67,17 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices[0].message.content ?? '{}'
     const aiCategories: string[] = JSON.parse(raw).categories ?? []
 
-    const upsertRows: { merchant: string; category: string }[] = []
+    const upsertRows: { merchant: string; category: string; user_id?: string }[] = []
     for (let j = 0; j < aiIndices.length; j++) {
       const i = aiIndices[j]
       const cat = aiCategories[j] ?? '기타'
       results[i] = cat
       const merchant = (transactions[i].description ?? '').trim()
-      if (merchant) upsertRows.push({ merchant, category: cat })
+      if (merchant) upsertRows.push({ merchant, category: cat, ...(user ? { user_id: user.id } : {}) })
     }
 
     if (upsertRows.length > 0) {
-      await supabase.from('merchant_categories').upsert(upsertRows, { onConflict: 'merchant' })
+      await supabase.from('merchant_categories').upsert(upsertRows, { onConflict: 'merchant,user_id' })
     }
   }
 
