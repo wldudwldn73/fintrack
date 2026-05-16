@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TransactionInsert, TransactionType } from '@/lib/types'
+import { TransactionInsert, TransactionType, ReceiptData } from '@/lib/types'
 import { getRuleBasedCategory } from '@/lib/categoryRules'
 import CategoryPicker from '@/components/CategoryPicker'
+import ReceiptUploader from '@/components/ReceiptUploader'
 
 interface Props {
   onSubmit: (tx: TransactionInsert) => Promise<void>
@@ -20,6 +21,15 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
   const [memo, setMemo] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(false)
+
+  function handleReceiptParsed(data: ReceiptData) {
+    setAmount(String(data.amount))
+    setDescription(data.storeName)
+    setDate(data.date)
+    setCategory(data.category)
+    setShowReceipt(false)
+  }
 
   useEffect(() => {
     if (!description || category) return
@@ -47,8 +57,27 @@ export default function TransactionForm({ onSubmit, onClose }: Props) {
       >
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-white">내역 추가</h3>
-          <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl transition-colors">×</button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowReceipt(v => !v)}
+              title="영수증 스캔"
+              className={`text-lg transition-colors ${showReceipt ? 'text-indigo-400' : 'text-white/40 hover:text-white/70'}`}
+            >
+              🧾
+            </button>
+            <button onClick={onClose} className="text-white/30 hover:text-white/70 text-xl transition-colors">×</button>
+          </div>
         </div>
+
+        {showReceipt && (
+          <div className="mb-4">
+            <ReceiptUploader
+              onParsed={handleReceiptParsed}
+              onCancel={() => setShowReceipt(false)}
+            />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Type toggle */}

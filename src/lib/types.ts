@@ -50,3 +50,11 @@ export const RECURRING_CATEGORIES = new Set(['구독', '주거'])
 
 export const EXPENSE_CATEGORIES = ['식비', '카페', '편의점', '교통', '쇼핑', '구독', '주거', '의료', '문화', '교육', '투자', '보험', '적금', '기부금', '카드대금', '기타'] as const
 export const INCOME_CATEGORIES = ['급여', '부업', '투자', '기타'] as const
+
+export interface ReceiptData {
+  storeName: string
+  amount: number
+  date: string
+  category: string
+  items: { name: string; price: number }[]
+}
