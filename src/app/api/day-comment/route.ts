@@ -1,9 +1,14 @@
 import Groq from 'groq-sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const DOW_KR = ['일', '월', '화', '수', '목', '금', '토']
 
 export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ story: null }, { status: 401 })
+
   const { date, categories, dayTotal, avgDaily, dow, avgDow } = await req.json() as {
     date: string
     categories: { category: string; amount: number; count: number }[]

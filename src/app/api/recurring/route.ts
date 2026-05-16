@@ -3,6 +3,9 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function GET() {
   const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ recurring: [] }, { status: 401 })
+
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 

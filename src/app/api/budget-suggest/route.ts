@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { EXPENSE_CATEGORIES } from '@/lib/types'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 const METHODOLOGIES = `
 ## 활용 가능한 재무 방법론
@@ -28,6 +29,10 @@ const METHODOLOGIES = `
 `
 
 export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const { salary, fixedExpenses = {} } = await req.json() as {
     salary: number

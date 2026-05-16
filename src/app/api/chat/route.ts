@@ -59,7 +59,7 @@ const tools: Groq.Chat.Completions.ChatCompletionTool[] = [
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function executeTool(name: string, args: Record<string, unknown>, supabase: SupabaseClient<any>): Promise<string> {
+async function executeTool(name: string, args: Record<string, unknown>, supabase: SupabaseClient<any>, userId: string): Promise<string> {
   if (name === 'add_transaction') {
     const { error } = await supabase.from('transactions').insert({
       type: args.type,
@@ -69,6 +69,7 @@ async function executeTool(name: string, args: Record<string, unknown>, supabase
       date: args.date,
       memo: args.memo ?? null,
       is_recurring: args.is_recurring ?? false,
+      user_id: userId,
     })
     return error ? `추가 실패: ${error.message}` : '추가 성공'
   }
@@ -88,6 +89,9 @@ async function executeTool(name: string, args: Record<string, unknown>, supabase
 export async function POST(req: NextRequest) {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
   const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { message, year, month, history } = await req.json()
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`
@@ -186,7 +190,7 @@ ${txSummary}
 
         for (const tc of toolCallBuffer) {
           const args = JSON.parse(tc.arguments) as Record<string, unknown>
-          const result = await executeTool(tc.name, args, supabase)
+          const result = await executeTool(tc.name, args, supabase, user.id)
           if (result.includes('성공')) dataChanged = true
           messages.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }

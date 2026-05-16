@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk'
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 interface TxInput {
   date: string
@@ -11,6 +12,10 @@ interface TxInput {
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { transactions, year, month } = await req.json() as {
     transactions: TxInput[]
     year: number

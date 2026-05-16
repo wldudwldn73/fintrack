@@ -2,8 +2,13 @@ import { NextRequest } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import sharp from 'sharp'
 import { EXPENSE_CATEGORIES } from '@/lib/types'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
   const formData = await req.formData()
   const file = formData.get('image') as File | null
 
